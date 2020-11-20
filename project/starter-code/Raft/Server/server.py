@@ -4,7 +4,6 @@ from Server.state import State
 from State_Machine.log import Log
 from ..Abstraction.timer import RaftRandomTime, RaftTime
 import request
-
 from flask import Flask
 
 
@@ -57,7 +56,18 @@ class Server:
 
             peers = self.rocket.get_peers()
             for (host, port) in peers:
-                requests.get('http:{}:{}/request'.format(host, port), body=json.dumps(VoteRequest().__))
+                if not self.log:
+                    jsonPayload = json.dumps(VoteRequest(self.currentTerm,
+                                                         (self.host, self.port),
+                                                         self.log[-1].index,
+                                                         self.log[-1].term).__dict__)
+                else:
+                    jsonPayload = json.dumps(VoteRequest(self.currentTerm,
+                                                         (self.host, self.port),
+                                                         0,
+                                                         0).__dict__)
+                requests.get('http:{}:{}/requestVote'.format(host, port),
+                             data=jsonPayload)
 
 
 
