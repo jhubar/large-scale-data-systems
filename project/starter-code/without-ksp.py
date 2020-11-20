@@ -23,8 +23,8 @@ def readout_state():
 
 
 def execute_action(action):
-    print(action)
-    print(actions[timestep])
+    #print(action)
+    #print(actions[timestep])
     for k in action.keys():
         assert(action[k] == actions[timestep][k])
 
