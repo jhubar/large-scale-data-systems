@@ -17,6 +17,8 @@ timestep = 0
 parser = argparse.ArgumentParser()
 parser.add_argument("--correct-fraction", type=float, default=1.0, help="Fraction of correct flight computers (default 1.0).")
 parser.add_argument("--flight-computers", type=int, default=3, help="Number of flight computers (default: 3).")
+parser.add_argument("--port", type=int, default=8000, help="The port of the first server (default: 8000).")
+parser.add_argument("--host", type=str, default="127.0.0.1", help="The IP addresses of the server (default: localhost)")
 arguments, _ = parser.parse_known_args()
 
 
@@ -37,9 +39,10 @@ def allocate_flight_computers(arguments):
     n_correct_fc = math.ceil(arguments.correct_fraction * n_fc)
     n_incorrect_fc = n_fc - n_correct_fc
     state = readout_state()
-    ports = [8000 + i for i in range(n_fc)]
-    host = '127.0.0.1'
-    peers = [(host, 8000 + i) for i in range(n_fc)]
+    first_port = arguments.port
+    ports = [first_port + i for i in range(n_fc)]
+    host = arguments.host
+    peers = [(host, first_port + i) for i in range(n_fc)]
     for i in range(n_correct_fc):
         flight_computers.append(FlightComputer(state))
         server = Server(flight_computers[-1], host, ports[i])

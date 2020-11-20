@@ -8,8 +8,12 @@ from flask import Flask, request, jsonify
 import json
 import threading
 import requests
+import logging
 
 app = Flask(__name__)
+# disable flask logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 class Server:
     def __init__(self, rocket, host, port):
@@ -33,18 +37,13 @@ class Server:
     def start_server(self, peers=[]):
         print('Starting {}:{}'.format(self.candidateID[0], self.candidateID[1]))
         for peer in peers:
-            if peer[1] != self.candidateID[1]:
+            if peer is not self.candidateID:
                 self.rocket.add_peer(peer)
         self.election_timer.start()
-        threading.Thread(target=self.launch_server).start()
+        threading.Thread(target=self.run_server).start()
 
-    def launch_server(self):
+    def run_server(self):
         app.run(debug=False, host=self.candidateID[0], port=self.candidateID[1])
-
-    @app.route('/')
-    def hello_world():
-        print("hey")
-        return '<p> Hello World </p>'
 
     def init_vote(self):
         self.vote = 0

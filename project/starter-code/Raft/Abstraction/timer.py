@@ -1,7 +1,10 @@
-# Raft uses random timer for election
-
 import threading
 import random
+
+"""
+    Abstraction of timer in the Raft algorithm.
+    For timeout election, each server has a random timeout.
+"""
 
 class RaftRandomTime:
     def __init__(self, min_time, max_time, function, args=None):
@@ -33,7 +36,7 @@ class RaftTimer:
         self.timer = threading.Timer
 
     def start(self):
-        self.time = threading.Timer(self.time,
+        self.timer = threading.Timer(self.time,
                                     self.function,
                                     args=self.args)
 
