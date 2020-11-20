@@ -12,7 +12,7 @@ import requests
 app = Flask(__name__)
 
 class Server:
-    def __init__(self, rocket, host, port, peers=[]):
+    def __init__(self, rocket, host, port):
         # Common to all server
         self.state = State.FOLLOWER
         self.currentTerm = 0
@@ -29,11 +29,12 @@ class Server:
         self.candidateID = (host, port)
         self.vote = 0
         self.election_timer = RaftRandomTime(5, 10, self.time_out)
-        for peer in peers:
-            self.rocket.add_peer(peer)
 
     def start_server(self, peers=[]):
         print('Starting {}:{}'.format(self.candidateID[0], self.candidateID[1]))
+        for peer in peers:
+            if peer[1] != self.candidateID[1]:
+                self.rocket.add_peer(peer)
         self.election_timer.start()
         threading.Thread(target=self.launch_server).start()
 

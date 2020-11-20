@@ -39,18 +39,21 @@ def allocate_flight_computers(arguments):
     state = readout_state()
     ports = [8000 + i for i in range(n_fc)]
     host = '127.0.0.1'
+    peers = [(host, 8000 + i) for i in range(n_fc)]
     for i in range(n_correct_fc):
         flight_computers.append(FlightComputer(state))
-        server = Server(flight_computers[-1], host, ports[i], peers=[(host, port) for port in ports])
-        threading.Thread(target=server.start_server).start()
+        server = Server(flight_computers[-1], host, ports[i])
+        threading.Thread(target=server.start_server, kwargs={'peers': peers,}).start()
 
     for _ in range(n_incorrect_fc):
         flight_computers.append(allocate_random_flight_computer(state))
     # Add the peers for the consensus protocol
+    """
     for fc in flight_computers:
         for peer in flight_computers:
             if fc != peer:
                 fc.add_peer(peer)
+    """
 
     return flight_computers
 
