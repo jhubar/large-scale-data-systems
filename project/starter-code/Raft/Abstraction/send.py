@@ -13,7 +13,7 @@ def send_get(peer, endpoint, params, TIMEOUT=0.075):
     try:
         reply = requests.get(url, params=params, timeout=TIMEOUT)
     except Exception as e:
-        # Any error between the two servers
+        # Any error between the two servers (Failure, reply too slow, ...)
         return None
 
     return reply_handler(reply)
@@ -23,12 +23,13 @@ def send_post(peer, endpoint, json, TIMEOUT=0.075):
     try:
         reply = requests.post(url, json=json)
     except Exception as e:
+        # Any error between the two servers (Failure, reply too slow, ...)
         return None
 
     return reply_handler(reply)
 
 def get_url(peer, endpoint):
-    return 'http:{}:{}/{}'.format(peer[0], peer[1], endpoint)
+    return 'http://{}:{}/{}'.format(peer[0], peer[1], endpoint)
 
 def reply_handler(reply):
     if reply.status_code == 200:

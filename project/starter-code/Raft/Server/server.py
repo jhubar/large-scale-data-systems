@@ -4,16 +4,16 @@ from .state import State
 from ..State_Machine.log import Log
 from ..Abstraction.timer import RaftRandomTime, RaftTimer
 from ..RPC.request_vote import VoteAnswer, VoteRequest
+from ..Abstraction.send import *
 from flask import Flask, request, jsonify
 import json
 import threading
-import requests
 import logging
 
 app = Flask(__name__)
 # disable flask logging
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+'''log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)'''
 
 class Server:
     def __init__(self, rocket, host, port):
@@ -24,21 +24,24 @@ class Server:
         self.log = []
         self.commitIndex = 0
         self.lastApplied = 0
-        # Only Leader plays with these variables
+        # Only Leader handles these variables
         self.nextIndex = []
         self.matchIndex = []
         # Flight Computer object
         self.rocket = rocket
         # Flask information
         self.candidateID = (host, port)
+        self.election_timer = RaftRandomTime(5, 25, self.time_out)
+        # Raft information
         self.vote = 0
-        self.election_timer = RaftRandomTime(5, 10, self.time_out)
+        self.majority = None
 
     def start_server(self, peers=[]):
         print('Starting {}:{}'.format(self.candidateID[0], self.candidateID[1]))
         for peer in peers:
             if peer is not self.candidateID:
                 self.rocket.add_peer(peer)
+        self.majority = ((len(peers) + 1) / 2) + 1
         self.election_timer.start()
         threading.Thread(target=self.run_server).start()
 
@@ -50,7 +53,6 @@ class Server:
 
     def time_out(self):
         self.init_vote()
-        print("Time out i am (port: {}) asking to be a leader".format(self.candidateID[1]))
         if self.state is State.LEADER:
             return
         else:
@@ -64,13 +66,43 @@ class Server:
             self.election_timer.reset()
 
             peers = self.rocket.get_peers()
-            for (host, port) in peers:
-                jsonPayload = json.dumps(VoteRequest(self.currentTerm,
-                                                     self.candidateID,
-                                                     self.log[-1].index if self.log else 0,
-                                                     self.log[-1].term if self.log else 0).__dict__)
-                print(jsonPayload)
-                #requests.post('http:{}:{}/requestVote'.format(host, port), data=jsonPayload)
+            for peerCandidateID in peers:
+                (lastLogIndex, lastLogTerm) = (self.log[-1].index, self.log[-1].term) if self.log else (0,0)
+                threading.Thread(target=self.run_election,
+                                 args=(self.currentTerm,
+                                        lastLogIndex,
+                                        lastLogTerm,
+                                        peerCandidateID)).start()
+
+    def run_election(self, currentTerm, lastLogIndex, lastLogTerm, peerCandidateID):
+        message = VoteRequest(currentTerm, self.candidateID, lastLogIndex, lastLogTerm).__dict__
+        # Post method
+        url = "vote_request"
+        # Need to loop while state is CANDIDATE and currentTerm == self.currentTerm
+        while self.state is State.CANDIDATE and currentTerm is self.currentTerm:
+            reply = send_post(peerCandidateID, url, message)
+            if reply is not None:
+                if reply.json()['voteGranted']:
+                    ''' A follower said yes to this candidate '''
+                    self.vote = self.vote + 1
+                    if self.vote >= self.majority:
+                        print("Server {}:{} is now a leader. Congrats".format(self.candidateID[0], self.candidateID[1]))
+                        self.state = State.LEADER
+                else:
+                    ''' A follower said No to this candidate '''
+                    if reply.json()['term'] > self.currentTerm:
+                        self.currentTerm = reply.json()['term']
+                        self.state = State.FOLLOWER
+                break
+
+        #print("Election of port = {} term = {} finished".format(self.candidateID[1], currentTerm))
+
+    @app.route('/vote_request', methods=['POST'])
+    def vote_request():
+        print("I DONT WANT TO VOTE")
+        print(request.json)
+        return jsonify(VoteAnswer(True, self.currentTerm, self.candidateID, 0, 0).__dict__)
+
 
     """
     def check_request_vote(self):

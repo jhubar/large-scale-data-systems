@@ -51,11 +51,15 @@ dependencies:
   - zlib=1.2.11=h516909a_1010
   - zstd=1.4.5=h6597ccf_2
   - pip:
+    - chardet==3.0.4
     - click==7.1.2
     - flask==1.1.2
+    - idna==2.10
     - itsdangerous==1.1.0
     - jinja2==2.11.2
     - krpc==0.4.8
     - markupsafe==1.1.1
     - protobuf==3.13.0
+    - requests==2.25.0
+    - urllib3==1.26.2
     - werkzeug==1.0.1
