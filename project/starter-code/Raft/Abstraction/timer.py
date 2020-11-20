@@ -4,7 +4,7 @@ from threading
 import random
 
 class RaftRandomTime:
-    def __init__(self, min_time, max_time, function, args):
+    def __init__(self, min_time, max_time, function, args=None):
         self.min_time = min_time
         self.max_time = max_time
         self.function = function
@@ -25,7 +25,7 @@ class RaftRandomTime:
 
 
 class RaftTimer:
-    def __init__(self, time, function, args):
+    def __init__(self, time, function, args=None):
         self.time = time
         self.function = function
         self.args = args
