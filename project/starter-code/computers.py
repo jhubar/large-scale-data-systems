@@ -21,6 +21,9 @@ class FlightComputer:
             self._handle_stage_8,
             self._handle_stage_9]
         self.stage_handler = self.stage_handlers[self.current_stage_index]
+        
+    def get_peers(self):
+        return self.peers
 
     def add_peer(self, peer):
         self.peers.append(peer)

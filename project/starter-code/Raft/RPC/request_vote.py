@@ -15,7 +15,7 @@ class VoteRequest:
         self.lastLogIndex = lastLogIndex
         self.lastLogTerm = lastLogTerm
 
-
+    
 
 class VoteAnswer:
     """

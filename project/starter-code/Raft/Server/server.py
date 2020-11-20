@@ -3,6 +3,7 @@
 from Server.state import State
 from State_Machine.log import Log
 from ..Abstraction.timer import RaftRandomTime, RaftTime
+import request
 
 from flask import Flask
 
@@ -27,6 +28,7 @@ class Server:
         # Flask information
         self.host = host
         self.port = port
+        self.vote = 0
 
     """
     peer = tuple (host, port)
@@ -36,12 +38,28 @@ class Server:
             self.add_peer(peer)
         app.run(debug=True, host=self.host, port=self.port)
 
+    def init_vote(self):
+        self.vote = 0
+
     def time_out(self):
+        self.init_vote()
         if(self.state is State.LEADER):
             return
         else:
+            # Goes to CANDIDATE state
             self.state = State.CANDIDATE
+            # Increment current term
+            self.currentTerm = self.currentTerm + 1
+            # Vote for itself
+            self.vote = self.vote + 1
+            # Start the timer election
             self.election_timer.reset()
+
+            peers = self.rocket.get_peers()
+            for (host, port) in peers:
+                requests.get('http:{}:{}/request'.format(host, port), body=json.dumps(VoteRequest().__))
+
+
 
 
     def add_peer(self, peer):
@@ -53,8 +71,19 @@ class Server:
     def election_procedure(self):
         pass
 
+    @app.
 
-    '''
+    @app.route('/appendEntries/')
+    def receiver_implementation(self):
+        content = request
+        if content['term'] < content['currentTerm']
+
+
+
+
+
+
+    """
     def electionSafety:
         pass
     def appendOnly:
@@ -63,4 +92,4 @@ class Server:
         pass
     def StateMachineSafety:
         pass
-    '''
+    """
