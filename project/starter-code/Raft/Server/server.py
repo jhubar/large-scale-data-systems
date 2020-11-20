@@ -25,8 +25,7 @@ class Server:
         # Flight Computer object
         self.rocket = rocket
         # Flask information
-        self.host = host
-        self.port = port
+        self.candidateID = (host, port)
         self.vote = 0
 
     """
@@ -42,7 +41,7 @@ class Server:
 
     def time_out(self):
         self.init_vote()
-        if(self.state is State.LEADER):
+        if self.state is State.LEADER:
             return
         else:
             # Goes to CANDIDATE state
@@ -56,20 +55,41 @@ class Server:
 
             peers = self.rocket.get_peers()
             for (host, port) in peers:
-                if not self.log:
-                    jsonPayload = json.dumps(VoteRequest(self.currentTerm,
-                                                         (self.host, self.port),
-                                                         self.log[-1].index,
-                                                         self.log[-1].term).__dict__)
-                else:
-                    jsonPayload = json.dumps(VoteRequest(self.currentTerm,
-                                                         (self.host, self.port),
-                                                         0,
-                                                         0).__dict__)
+                jsonPayload = json.dumps(VoteRequest(self.currentTerm,
+                                                     self.candidateID,
+                                                     self.log.empty ? 0 : self.log[-1].index,
+                                                     self.log.empty ? 0 : self.log[-1].term).__dict__)
+
                 requests.get('http:{}:{}/requestVote'.format(host, port),
                              data=jsonPayload)
 
+    @app.route('/requestVote', methods=['GET'])
 
+    def aws(self,aws):
+        json_vote_answer = json.dumps(VoteAnswer(aws,
+                                                 self.currentTerm,
+                                                 self.candidateID,
+                                                 self.log.empty ? 0 : self.log[-1].index,
+                                                 self.log.empty ? 0 : self.log[-1].log).__dict__)
+
+    def check_request_vote(self):
+        voteBody = resquests.json
+        (candidate_host, candidate_port) = voteBody['candidateID'][1]
+        if voteBody['term'] < self.currentTerm:
+            self.aws(self,False)
+            requests.get('http:{}:{}/replyVote'.format(candidate_host, candidate_port),
+                         data=json_vote_answer)
+            return
+
+        if  not self.log\
+            and self.votedFor is None \
+            or self.votedFor is votedBody['candidateID']\
+            and (self.log[-1].term, self.log[-1].index) is (voteBody['lastLogTerm'], voteBody['lastLogIndex']):
+            self.aws(self,True)
+
+    @app.route('/replyVote', methods=['GET'])
+    def candidate_vote_reply(self):
+        pass
 
 
     def add_peer(self, peer):
