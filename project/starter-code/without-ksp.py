@@ -5,6 +5,8 @@ import numpy as np
 import time
 
 from computers import *
+from Raft.Server.server import Server
+import threading
 
 # Load the pickle files
 actions = pickle.load(open("data/actions.pickle", "rb"))
@@ -35,8 +37,13 @@ def allocate_flight_computers(arguments):
     n_correct_fc = math.ceil(arguments.correct_fraction * n_fc)
     n_incorrect_fc = n_fc - n_correct_fc
     state = readout_state()
-    for _ in range(n_correct_fc):
+    ports = [8000 + i for i in range(n_fc)]
+    host = '127.0.0.1'
+    for i in range(n_correct_fc):
         flight_computers.append(FlightComputer(state))
+        server = Server(flight_computers[-1], host, ports[i], peers=[(host, port) for port in ports])
+        threading.Thread(target=server.start_server).start()
+
     for _ in range(n_incorrect_fc):
         flight_computers.append(allocate_random_flight_computer(state))
     # Add the peers for the consensus protocol

@@ -1,3 +1,8 @@
 /project/Miniconda3-latest-Linux-x86_64.sh
 /project/fbw.egg-info/
 /project/starter-code/__pycache__/
+/project/starter-code/Raft/__pycache__
+/project/starter-code/Raft/Abstraction/__pycache__
+/project/starter-code/Raft/RPC/__pycache__
+/project/starter-code/Raft/Server/__pycache__
+/project/starter-code/Raft/State_Machine/__pycache__

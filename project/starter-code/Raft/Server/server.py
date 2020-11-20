@@ -1,19 +1,20 @@
 # Flask for each FLight Computer. The server implements Raft Consensus Algorithm
 
-from Server.state import State
-from State_Machine.log import Log
-from ..Abstraction.timer import RaftRandomTime, RaftTime
-import request
-from flask import Flask
-
+from .state import State
+from ..State_Machine.log import Log
+from ..Abstraction.timer import RaftRandomTime, RaftTimer
+from ..RPC.request_vote import VoteAnswer, VoteRequest
+from flask import Flask, request, jsonify
+import json
+import threading
+import requests
 
 app = Flask(__name__)
 
 class Server:
-    def __init__(self, rocket, host, port):
+    def __init__(self, rocket, host, port, peers=[]):
         # Common to all server
         self.state = State.FOLLOWER
-        self.election_timer = RaftRandomTime(0.15, 0.3, self.time_out)
         self.currentTerm = 0
         self.votedFor = None
         self.log = []
@@ -27,20 +28,29 @@ class Server:
         # Flask information
         self.candidateID = (host, port)
         self.vote = 0
-
-    """
-    peer = tuple (host, port)
-    """
-    def start_server(self, peers=[]):
+        self.election_timer = RaftRandomTime(5, 10, self.time_out)
         for peer in peers:
-            self.add_peer(peer)
-        app.run(debug=True, host=self.host, port=self.port)
+            self.rocket.add_peer(peer)
+
+    def start_server(self, peers=[]):
+        print('Starting {}:{}'.format(self.candidateID[0], self.candidateID[1]))
+        self.election_timer.start()
+        threading.Thread(target=self.launch_server).start()
+
+    def launch_server(self):
+        app.run(debug=False, host=self.candidateID[0], port=self.candidateID[1])
+
+    @app.route('/')
+    def hello_world():
+        print("hey")
+        return '<p> Hello World </p>'
 
     def init_vote(self):
         self.vote = 0
 
     def time_out(self):
         self.init_vote()
+        print("Time out i am (port: {}) asking to be a leader".format(self.candidateID[1]))
         if self.state is State.LEADER:
             return
         else:
@@ -57,21 +67,12 @@ class Server:
             for (host, port) in peers:
                 jsonPayload = json.dumps(VoteRequest(self.currentTerm,
                                                      self.candidateID,
-                                                     self.log.empty ? 0 : self.log[-1].index,
-                                                     self.log.empty ? 0 : self.log[-1].term).__dict__)
+                                                     self.log[-1].index if self.log else 0,
+                                                     self.log[-1].term if self.log else 0).__dict__)
+                print(jsonPayload)
+                #requests.post('http:{}:{}/requestVote'.format(host, port), data=jsonPayload)
 
-                requests.get('http:{}:{}/requestVote'.format(host, port),
-                             data=jsonPayload)
-
-    @app.route('/requestVote', methods=['GET'])
-
-    def aws(self,aws):
-        json_vote_answer = json.dumps(VoteAnswer(aws,
-                                                 self.currentTerm,
-                                                 self.candidateID,
-                                                 self.log.empty ? 0 : self.log[-1].index,
-                                                 self.log.empty ? 0 : self.log[-1].log).__dict__)
-
+    """
     def check_request_vote(self):
         voteBody = resquests.json
         (candidate_host, candidate_port) = voteBody['candidateID'][1]
@@ -101,25 +102,8 @@ class Server:
     def election_procedure(self):
         pass
 
-    @app.
-
     @app.route('/appendEntries/')
     def receiver_implementation(self):
         content = request
         if content['term'] < content['currentTerm']
-
-
-
-
-
-
-    """
-    def electionSafety:
-        pass
-    def appendOnly:
-        pass
-    def LeaderCompleness:
-        pass
-    def StateMachineSafety:
-        pass
     """

@@ -1,6 +1,6 @@
 # Raft uses random timer for election
 
-from threading
+import threading
 import random
 
 class RaftRandomTime:
@@ -15,9 +15,10 @@ class RaftRandomTime:
         return random.random()*(self.max_time - self.min_time) + self.min_time
 
     def start(self):
-        self.time = threading.Timer(self._set_raft_time(),
+        self.timer = threading.Timer(self._set_raft_time(),
                                     self.function,
                                     args=self.args)
+        self.timer.start()
 
     def reset(self):
         self.timer.cancel()
