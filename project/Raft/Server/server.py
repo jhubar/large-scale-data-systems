@@ -91,7 +91,7 @@ class Server:
         if self.state != State.LEADER:
             self.state = State.LEADER
             print("Server {}:{} is now a leader. Congrats".format(self.candidateID[0], self.candidateID[1]))
-            # TODO: Beginning heartbeat (AppendEntries)
+            # TODO: Beginning heartbeat (AppendEntries),
         self.votedFor = None
 
 
