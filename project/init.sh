@@ -22,6 +22,6 @@ echo "" > pid.txt 2>&1
 for i in `seq 1 $flight_computers`;
 do
   let "current_port = port + i"
-  python flask_raft.py --correct-fraction $correct_fraction --flight_computers $flight_computers --port $current_port --host $host &
+  python flask_raft.py  --port $current_port --host $host &
   echo "processus pid $!" >> pid.txt 2>&1
 done
