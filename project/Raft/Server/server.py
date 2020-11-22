@@ -28,7 +28,7 @@ class Server:
         self.rocket = rocket
         # Flask information
         self.id = id
-        self.election_timer = RaftRandomTime(5, 12, self.time_out)
+        self.election_timer = RaftRandomTime(2, 10, self.time_out)
         # Raft information
         self.vote = 0
         self.majority = math.floor((len(peers) + 1) / 2) + 1
@@ -41,7 +41,7 @@ class Server:
     def init_vote(self):
         self.vote = 0
 
-    def reset_timer(self):
+    def reset_election_timer(self):
         self.election_timer.reset()
 
     """
@@ -51,6 +51,7 @@ class Server:
         if self.state is State.LEADER:
             return
         else:
+            # Start an election
             print("The server http://{}:{}/ has an election timeout".format(self.id['host'], self.id['port']))
             self.init_vote()
             # Goes to CANDIDATE state
@@ -62,14 +63,13 @@ class Server:
             self.vote = self.vote + 1
             # Start the timer election
             self.election_timer.reset()
-
+            # get the peers and send a VoteRequest
             peers = self.rocket.get_peers()
             for peerCandidateID in peers:
-                (lastLogIndex, lastLogTerm) = (self.log[-1].index, self.log[-1].term) if self.log else (0,0)
                 threading.Thread(target=self.run_election,
                                  args=(self.currentTerm,
-                                        lastLogIndex,
-                                        lastLogTerm,
+                                        self._last_log_index(),
+                                        self._last_log_term(),
                                         peerCandidateID)).start()
 
     def run_election(self, currentTerm, lastLogIndex, lastLogTerm, peerCandidateID):
@@ -79,25 +79,38 @@ class Server:
         # Need to loop while state is CANDIDATE and currentTerm == self.currentTerm
         while self.state is State.CANDIDATE and currentTerm is self.currentTerm:
             reply = send_post(peerCandidateID, url, message)
-            if reply is not None:
+            if reply is not None and self.state is State.CANDIDATE:
                 if reply.json()['voteGranted']:
-                    ''' A follower said yes to this candidate '''
+                    # A follower said yes to this candidate
                     self.vote = self.vote + 1
                     if self.vote >= self.majority:
                         self._become_leader()
                 else:
-                    ''' A follower said No to this candidate '''
-                    if reply.json()['term'] > self.currentTerm:
-                        self.currentTerm = reply.json()['term']
-                        self.state = State.FOLLOWER
+                    # A follower said No to this candidate
+                    if reply.json()['term'] > self.currentTerm\
+                    and self.state is State.CANDIDATE:
+                        # Update and reset some variables
+                        self.cancel_server_election(reply.json()['term'])
                 return
+
+    def cancel_server_election(self, term):
+        """
+        Cancel the election of a candidate
+        """
+        # Update variables and then reset the election time
+        self.currentTerm = term
+        self.state = State.FOLLOWER
+        self.votedFor = None
+        self.vote = 0
+        self.reset_election_timer()
 
     def _become_leader(self):
         if self.state == State.CANDIDATE:
-            self.state = State.LEADER
             print("Server {}:{} is now a leader. Congrats.".format(self.id['host'], self.id['port']))
-            self._start_heartbeat_to_follower()
+            # Update variables
+            self.state = State.LEADER
             self.votedFor = None
+            self._start_heartbeat_to_follower()
 
     def grant_vote(self, term, candidateID):
         """
@@ -149,18 +162,20 @@ class Server:
         while self.state is State.LEADER:
             message = AppendEntriesRequest(self.currentTerm,
                                            self.id,
-                                           self.log[-1].index if self.log else 0,
-                                           self.log[-1].term if self.log else 0,
+                                           self._last_log_index(),
+                                           self._last_log_term(),
                                            None,
                                            self.commitIndex).__dict__
             reply = send_post(peerCandidateID, url, message)
-            #print(reply.json())
-
-
 
     """
     Various function
     """
+    def _last_log_index(self):
+        return self.log[-1].index if self.log else 0
+
+    def _last_log_term(self):
+        return self.log[-1].term if self.log else 0
 
     def commitmend_extraCondition(self):
         """

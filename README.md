@@ -11,3 +11,7 @@
 1. [François Lievens](https://github.com/francoislievens)
 1. [Antoine Leroy](https://github.com/AntoineLer)
 1. [Hubar Julien](https://github.com/julien1941)
+
+# Useful links
+
+1. [Pseudo code](http://disi.unitn.it/~montreso/ds/handouts17/09-raft.pdf)
