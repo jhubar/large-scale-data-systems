@@ -20,11 +20,31 @@ log.setLevel(logging.ERROR)
 def h():
     return "hello world"
 
+
 @app.route('/vote_request', methods=['POST'])
 def vote_request():
-    print("I DONT WANT TO VOTE")
-    print(request.json)
-    return jsonify(VoteAnswer(True, server.currentTerm, server.candidateID, 0, 0).__dict__)
+    """
+    Rules:  - Reply false if term < currentTerm
+            - If votedFor is null or candidateId, and candidate’s log is at
+              least as up-to-date as receiver’s log, grant vote
+    """
+    request_json = request.json
+    answer = None
+    if server.currentTerm > request_json['term']:
+        answer = jsonify(VoteAnswer(False,
+                                    server.currentTerm,
+                                    server.candidateID).__dict__)
+    elif server.votedFor is None or server.votedFor is tuple(request['candidateID']) and server.check_log_safety(request_json['lastLogTerm'], request_json['lastLogIndex']):
+        answer = jsonify(VoteAnswer(True,
+                                    server.currentTerm,
+                                    server.candidateID).__dict__)
+        server.vote_granted(request_json['term'], request_json['candidateID'])
+    else:
+        answer = jsonify(VoteAnswer(False,
+                                    server.currentTerm,
+                                    server.candidateID).__dict__)
+
+    return answer
 
 # Load the pickle files
 actions = pickle.load(open("data/actions.pickle", "rb"))

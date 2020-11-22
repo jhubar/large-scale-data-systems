@@ -43,7 +43,7 @@ class Server:
         self.vote = 0
 
     def time_out(self):
-        print("TIMEOUT {}".format(self.candidateID[1]))
+        print("The server http://{}:{}/ has an election timeout".format(self.candidateID[0], self.candidateID[1]))
         self.init_vote()
         if self.state is State.LEADER:
             return
@@ -53,6 +53,7 @@ class Server:
             # Increment current term
             self.currentTerm = self.currentTerm + 1
             # Vote for itself
+            self.votedFor = self.candidateID
             self.vote = self.vote + 1
             # Start the timer election
             self.election_timer.reset()
@@ -78,11 +79,56 @@ class Server:
                     ''' A follower said yes to this candidate '''
                     self.vote = self.vote + 1
                     if self.vote >= self.majority:
-                        print("Server {}:{} is now a leader. Congrats".format(self.candidateID[0], self.candidateID[1]))
-                        self.state = State.LEADER
+                        self._become_leader()
                 else:
                     ''' A follower said No to this candidate '''
                     if reply.json()['term'] > self.currentTerm:
                         self.currentTerm = reply.json()['term']
                         self.state = State.FOLLOWER
-                break
+                return
+
+    def _become_leader(self):
+        if self.state != State.LEADER:
+            self.state = State.LEADER
+            print("Server {}:{} is now a leader. Congrats".format(self.candidateID[0], self.candidateID[1]))
+            # TODO: Beginning heartbeat (AppendEntries)
+        self.votedFor = None
+
+
+    def vote_granted(self, term, candidateID):
+        """
+        Accepts the vote
+        update the term
+        update the candidateID
+        reset the timer
+
+        """
+        self.currentTerm = term
+        self.votedFor = tuple(candidateID)
+        self.election_timer.reset()
+
+    def check_log_safety(self, lastLogTerm, lastLogIndex):
+        """
+        Check if a the last log of the server is as up-to-date than the last
+        log of the candidate.
+        return True if last log is up-to-date with the candidate
+               False otherwise
+        """
+        if self.log:
+            if self.log[-1].term <= lastLogTerm \
+            and self.log[-1].index <= lastLogIndex:
+                return  True
+            else:
+                return  False
+        else:
+            return True
+
+    def commitmend_extraCondition(self):
+        """
+        Election Safety:
+        Leader Append-Only:
+        Log Matching:
+        Leader Completeness:
+        State Machine Safety:
+        """
+        pass
