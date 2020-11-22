@@ -17,11 +17,11 @@ fi
 
 port=8000
 host="127.0.0.1"
-echo "" > pid.txt 2>&1
+echo "" > kill.sh 2>&1
 
 for i in `seq 1 $flight_computers`;
 do
   let "current_port = port + i"
   python flask_raft.py  --port $current_port --host $host &
-  echo "processus pid $!" >> pid.txt 2>&1
+  echo "kill $!" >> kill.sh 2>&1
 done
