@@ -29,7 +29,7 @@ def send_post(peer, endpoint, json, TIMEOUT=0.075):
     return reply_handler(reply)
 
 def get_url(peer, endpoint):
-    return 'http://{}:{}/{}'.format(peer[0], peer[1], endpoint)
+    return 'http://{}:{}/{}'.format(peer['host'], peer['port'], endpoint)
 
 def reply_handler(reply):
     if reply.status_code == 200:

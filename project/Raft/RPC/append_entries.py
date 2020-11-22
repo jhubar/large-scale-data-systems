@@ -8,7 +8,7 @@ class AppendEntriesRequest():
     entries: log entries to store (empty for heartbeat; may send more than one for efficiency)
     leaderCommit: leader’s commitIndex
     """
-    def __init__(self,term,leaderId,prevLogIndex,predLogTerm,entries, leaderCommit):
+    def __init__(self, term, leaderId, prevLogIndex, predLogTerm, entries, leaderCommit):
         self.term = term
         self.leaderId = leaderId
         self.prevLogIndex = prevLogIndex
@@ -16,11 +16,11 @@ class AppendEntriesRequest():
         self.entries = entries
         self.leaderCommit = leaderCommit
 
-    def results(self):
-        """
-        term: currentTerm, for leader to update itself
-        success true if follower contained entry matching prevLogIndex and prevLogTerm
-        """
-
-        success = True
-        return self.term,success
+class AppendEntriesAnswer():
+    """
+    term: currentTerm, for leader to update itself
+    success: true if follower contained entry matching prevLogIndex and prevLogTerm
+    """
+    def __init__(self, term, success):
+        self.term = term
+        self.succes = success

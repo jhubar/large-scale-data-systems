@@ -4,14 +4,16 @@ from .state import State
 from ..State_Machine.log import Log
 from ..Abstraction.timer import RaftRandomTime, RaftTimer
 from ..RPC.request_vote import VoteAnswer, VoteRequest
+from ..RPC.append_entries import *
 from ..Abstraction.send import *
 from flask import Flask, request, jsonify
 import json
+import math
 import threading
 import logging
 
 class Server:
-    def __init__(self, rocket, host, port, peers=[]):
+    def __init__(self, rocket, id, peers=[]):
         # Common to all server
         self.state = State.FOLLOWER
         self.currentTerm = 0
@@ -25,35 +27,38 @@ class Server:
         # Flight Computer object
         self.rocket = rocket
         # Flask information
-        self.candidateID = (host, port)
-        self.election_timer = RaftRandomTime(5, 25, self.time_out)
+        self.id = id
+        self.election_timer = RaftRandomTime(5, 12, self.time_out)
         # Raft information
         self.vote = 0
-        self.majority = ((len(peers) + 1) / 2) + 1
+        self.majority = math.floor((len(peers) + 1) / 2) + 1
         for peer in peers:
             self.rocket.add_peer(peer)
 
     def start_server(self):
         self.election_timer.start()
 
-    def run_server(self):
-        app.run(debug=False, host=self.candidateID[0], port=self.candidateID[1])
-
     def init_vote(self):
         self.vote = 0
 
+    def reset_timer(self):
+        self.election_timer.reset()
+
+    """
+    Election handler
+    """
     def time_out(self):
-        print("The server http://{}:{}/ has an election timeout".format(self.candidateID[0], self.candidateID[1]))
-        self.init_vote()
         if self.state is State.LEADER:
             return
         else:
+            print("The server http://{}:{}/ has an election timeout".format(self.id['host'], self.id['port']))
+            self.init_vote()
             # Goes to CANDIDATE state
             self.state = State.CANDIDATE
             # Increment current term
             self.currentTerm = self.currentTerm + 1
             # Vote for itself
-            self.votedFor = self.candidateID
+            self.votedFor = self.id
             self.vote = self.vote + 1
             # Start the timer election
             self.election_timer.reset()
@@ -68,7 +73,7 @@ class Server:
                                         peerCandidateID)).start()
 
     def run_election(self, currentTerm, lastLogIndex, lastLogTerm, peerCandidateID):
-        message = VoteRequest(currentTerm, self.candidateID, lastLogIndex, lastLogTerm).__dict__
+        message = VoteRequest(currentTerm, self.id, lastLogIndex, lastLogTerm).__dict__
         # Post method
         url = "vote_request"
         # Need to loop while state is CANDIDATE and currentTerm == self.currentTerm
@@ -88,26 +93,30 @@ class Server:
                 return
 
     def _become_leader(self):
-        if self.state != State.LEADER:
+        if self.state == State.CANDIDATE:
             self.state = State.LEADER
-            print("Server {}:{} is now a leader. Congrats".format(self.candidateID[0], self.candidateID[1]))
-            # TODO: Beginning heartbeat (AppendEntries),
-        self.votedFor = None
+            print("Server {}:{} is now a leader. Congrats.".format(self.id['host'], self.id['port']))
+            self._start_heartbeat_to_follower()
+            self.votedFor = None
 
-
-    def vote_granted(self, term, candidateID):
+    def grant_vote(self, term, candidateID):
         """
         Accepts the vote
         update the term
-        update the candidateID
-        reset the timer
-
+        set the voteFor at candidateID (Allow to avoid double vote)
+        reset the timer 'election timer'
         """
         self.currentTerm = term
-        self.votedFor = tuple(candidateID)
+        self.votedFor = candidateID
         self.election_timer.reset()
 
-    def check_log_safety(self, lastLogTerm, lastLogIndex):
+    def check_consistent_vote(self, candidateID):
+        if self.votedFor is None or self.votedFor is candidateID:
+            # The server has not voted yet, or already voted for this candidate
+            return True
+        return False
+
+    def check_election_log_safety(self, lastLogTerm, lastLogIndex):
         """
         Check if a the last log of the server is as up-to-date than the last
         log of the candidate.
@@ -122,6 +131,36 @@ class Server:
                 return  False
         else:
             return True
+
+    """
+    Heartbeat handler
+    """
+    def _start_heartbeat_to_follower(self):
+        """
+        Send hearbeat to follower at each time step
+        """
+        for peerCandidateID in self.rocket.get_peers():
+            threading.Thread(target=self._send_heartbeat,
+                             args=(peerCandidateID,)).start()
+
+
+    def _send_heartbeat(self, peerCandidateID):
+        url = "append_entries"
+        while self.state is State.LEADER:
+            message = AppendEntriesRequest(self.currentTerm,
+                                           self.id,
+                                           self.log[-1].index if self.log else 0,
+                                           self.log[-1].term if self.log else 0,
+                                           None,
+                                           self.commitIndex).__dict__
+            reply = send_post(peerCandidateID, url, message)
+            #print(reply.json())
+
+
+
+    """
+    Various function
+    """
 
     def commitmend_extraCondition(self):
         """

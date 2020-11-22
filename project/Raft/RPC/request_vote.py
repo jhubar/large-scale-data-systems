@@ -25,7 +25,6 @@ class VoteAnswer:
     lastLogIndex index of candidate's last log entry
     lastLogTerm: term of candidate's last log entry
     """
-    def __init__(self, voteGranted, term, candidateID):
+    def __init__(self, voteGranted, term):
         self.voteGranted = voteGranted
         self.term = term
-        self.candidateID = candidateID
