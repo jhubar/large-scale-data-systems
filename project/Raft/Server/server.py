@@ -181,8 +181,8 @@ class Server:
     Heartbeat handler
     """
     def decide_heartbeat(self):
+        # TODO: Just a useless method just for handling election safe during dev of Raft
         self.reset_election_timer()
-        self.votedFor = None
 
     def _start_heartbeat_to_follower(self):
         """
