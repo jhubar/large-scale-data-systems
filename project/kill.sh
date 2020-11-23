@@ -1,4 +1,4 @@
 
-kill 7673
-kill 7674
-kill 7675
+kill 1030
+kill 1031
+kill 1032

@@ -1,5 +1,5 @@
 
 class Log:
-    def __init__(self, term, index):
+    def __init__(self, term, command):
         self.term = term
-        self.index = index
+        self.command = command

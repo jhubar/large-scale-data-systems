@@ -6,9 +6,6 @@ import json
 from flask import Flask, request, jsonify
 import logging
 from Raft.Server.server import Server
-from Raft.Server.state import State
-from Raft.RPC.request_vote import *
-from Raft.RPC.append_entries import *
 import pickle
 from starter_code.computers import FlightComputer
 
@@ -28,38 +25,13 @@ def vote_request():
               least as up-to-date as receiver’s log, grant vote
     """
     request_json = request.json
-    answer = None
-
-    if server.currentTerm < request_json['term']:
-        # TODO: Check if ok
-        server.cancel_server_election(request_json['term'])
-
-    if request_json['term'] == server.currentTerm and \
-    server.check_consistent_vote(request_json['candidateID']) and \
-    server.check_election_log_safety(request_json['lastLogTerm'], \
-                                     request_json['lastLogIndex']):
-        # The server grant this candidate
-        print("Server http://{}:{} voted for server http://{}:{}"\
-        .format(server.id['host'],
-                server.id['port'],
-                request_json['candidateID']['host'],
-                request_json['candidateID']['port']))
-        answer = jsonify(VoteAnswer(True,
-                                    server.currentTerm).__dict__)
-        server.grant_vote(request_json['term'], request_json['candidateID'])
-    else:
-        # The FOLLOWER server cannot grant this candidate
-        answer = jsonify(VoteAnswer(False,
-                                    server.currentTerm).__dict__)
-    return answer
+    return server.decide_vote(request_json)
 
 @app.route('/append_entries', methods=['POST'])
 def heartbeat_request():
-    # The server receives a heartbeat from a "leader".
     request_json = request.json
-    #print(request_json)
-    server.reset_election_timer()
-    server.votedFor = None
+    # TODO: Update Here
+    server.decide_heartbeat()
     """
     if server.currentTerm > request_json['term']:
         return jsonify(AppendEntriesAnswer(server.currentTerm, False).__dict__)

@@ -90,10 +90,10 @@ class Server:
                     if reply.json()['term'] > self.currentTerm\
                     and self.state is State.CANDIDATE:
                         # Update and reset some variables
-                        self.cancel_server_election(reply.json()['term'])
+                        self._become_follower(reply.json()['term'])
                 return
 
-    def cancel_server_election(self, term):
+    def _become_follower(self, term):
         """
         Cancel the election of a candidate
         """
@@ -111,8 +111,39 @@ class Server:
             self.state = State.LEADER
             self.votedFor = None
             self._start_heartbeat_to_follower()
+            # TODO: Il me semble qu'il faut initialiser nextIndex et matchIndex à chaque nouveau leader
 
-    def grant_vote(self, term, candidateID):
+    def decide_vote(self, request_json):
+        """
+        Server deciding a vote request from a candidate
+        """
+        answer = None
+
+        if self.currentTerm < request_json['term']:
+            # Ensure that the server stays or become a follower in this case
+            self._become_follower(request_json['term'])
+
+        if request_json['term'] == self.currentTerm and \
+        self._check_consistent_vote(request_json['candidateID']) and \
+        self._check_election_log_safety(request_json['lastLogTerm'], \
+                                       request_json['lastLogIndex']):
+            # The server grant this candidate
+            print("Server http://{}:{} voted for server http://{}:{}"\
+            .format(self.id['host'],
+                    self.id['port'],
+                    request_json['candidateID']['host'],
+                    request_json['candidateID']['port']))
+            answer = jsonify(VoteAnswer(True,
+                                        self.currentTerm).__dict__)
+            self._grant_vote(request_json['term'], request_json['candidateID'])
+        else:
+            # The FOLLOWER server cannot grant this candidate
+            answer = jsonify(VoteAnswer(False,
+                                        self.currentTerm).__dict__)
+
+        return answer
+
+    def _grant_vote(self, term, candidateID):
         """
         Accepts the vote
         update the term
@@ -123,13 +154,14 @@ class Server:
         self.votedFor = candidateID
         self.election_timer.reset()
 
-    def check_consistent_vote(self, candidateID):
+    def _check_consistent_vote(self, candidateID):
         if self.votedFor is None or self.votedFor is candidateID:
             # The server has not voted yet, or already voted for this candidate
             return True
+        # The server cannot vote for this candidate
         return False
 
-    def check_election_log_safety(self, lastLogTerm, lastLogIndex):
+    def _check_election_log_safety(self, lastLogTerm, lastLogIndex):
         """
         Check if a the last log of the server is as up-to-date than the last
         log of the candidate.
@@ -138,7 +170,7 @@ class Server:
         """
         if self.log:
             if self.log[-1].term <= lastLogTerm \
-            and self.log[-1].index <= lastLogIndex:
+            and len(self.log) <= lastLogIndex:
                 return  True
             else:
                 return  False
@@ -148,6 +180,10 @@ class Server:
     """
     Heartbeat handler
     """
+    def decide_heartbeat(self):
+        self.reset_election_timer()
+        self.votedFor = None
+
     def _start_heartbeat_to_follower(self):
         """
         Send hearbeat to follower at each time step
@@ -172,7 +208,7 @@ class Server:
     Various function
     """
     def _last_log_index(self):
-        return self.log[-1].index if self.log else 0
+        return len(self.log)
 
     def _last_log_term(self):
         return self.log[-1].term if self.log else 0
