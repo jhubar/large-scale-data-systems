@@ -215,6 +215,7 @@ class Raft:
         self.lock_append_entries.acquire()
         self.log.append(self.currentTerm, request_json['command'])
         self.lock_append_entries.release()
+        return True
 
     def _send_append_entries(self, peer):
 

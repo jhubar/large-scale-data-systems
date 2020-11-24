@@ -43,7 +43,7 @@ def get_command():
     elif raft.state is State.CANDIDATE:
         return jsonify(False)
     else:
-        return raft.execute_commande(request.json)
+        return jsonify(raft.execute_commande(request.json))
 
 # Load the pickle files
 actions = pickle.load(open("data/actions.pickle", "rb"))
