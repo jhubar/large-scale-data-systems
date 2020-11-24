@@ -13,6 +13,7 @@ import json
 import math
 import threading
 import logging
+import time
 
 class Raft:
     def __init__(self, rocket, id, peers=[]):
@@ -30,7 +31,7 @@ class Raft:
         self.rocket = rocket
         # Flask information
         self.id = id
-        self.election_timer = RaftRandomTime(2, 10, self.time_out)
+        self.election_timer = RaftRandomTime(0.15, 0.3, self.time_out)
         # Raft information
         self.vote = 0
         self.majority = math.floor((len(peers) + 1) / 2) + 1
@@ -38,6 +39,9 @@ class Raft:
             self.rocket.add_peer(peer)
         # Various variable (Locks, etc)
         self.lock_append_entries = threading.Lock()
+        self.become_leader_lock = threading.Lock()
+        print("Sleeping for 5 s...")
+        time.sleep(5)
 
     def _init_next_index(self, peers):
         nextIndex = {}
@@ -122,8 +126,11 @@ class Raft:
         self.reset_election_timer()
         if self.lock_append_entries.locked():
             self.lock_append_entries.release()
+        if self.become_leader_lock.locked():
+            self.become_leader_lock.release()
 
     def _become_leader(self):
+        self.become_leader_lock.acquire()
         if self.state == State.CANDIDATE:
             print("Raft server {}:{} is now a leader. Congrats.".format(self.id['host'], self.id['port']))
             # Update variables
@@ -131,10 +138,10 @@ class Raft:
             for peer in self.rocket.get_peers():
                 self.nextIndex[(peer['host'], peer['port'])] = self.commitIndex + 1
                 self.matchIndex[(peer['host'], peer['port'])] = self.commitIndex
-            # Create Thread for sendAppendEntries
-            for peer in self.rocket.get_peers():
                 threading.Thread(target=self._send_append_entries,
                                  args=(peer,)).start()
+            self.become_leader_lock.release()
+
 
     def decide_vote(self, request_json):
         """
@@ -262,9 +269,9 @@ class Raft:
 
     def receive_leader_command(self, request_json):
         if request_json['term'] > self.currentTerm:
-            self._become_follower(self.term)
+            self._become_follower(request_json['term'])
         if request_json['term'] < self.currentTerm:
-            return AppendEntriesAnswer(self.currentTerm, False, -1)
+            return AppendEntriesAnswer(self.currentTerm, False, -1).__dict__
         else:
             index = 0
             prevLogIndex = request_json['prevLogIndex']

@@ -31,7 +31,7 @@ def vote_request():
 @app.route('/append_entries', methods=['POST'])
 def append_entries():
     request_json = request.json
-    return raft.receive_leader_command(request_json)
+    return jsonify(raft.receive_leader_command(request_json))
 
 @app.route('/command', methods=['GET'])
 def get_command():
