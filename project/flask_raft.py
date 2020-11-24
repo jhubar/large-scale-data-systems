@@ -6,6 +6,7 @@ import json
 from flask import Flask, request, jsonify
 import logging
 from Raft.Server.server import Server
+from Raft.Server.state import State
 import pickle
 from starter_code.computers import FlightComputer
 
@@ -28,19 +29,21 @@ def vote_request():
     return server.decide_vote(request_json)
 
 @app.route('/append_entries', methods=['POST'])
-def heartbeat_request():
+def append_entries():
     request_json = request.json
-    # TODO: Update Here
-    server.decide_heartbeat()
-    """
-    if server.currentTerm > request_json['term']:
-        return jsonify(AppendEntriesAnswer(server.currentTerm, False).__dict__)
-    elif server.check_log_index(request_json['lastLogIndex']):
-        return jsonify(AppendEntriesAnswer(server.currentTerm, False).__dict__)
-    elif server.check_existing_entry(request_json['entries']):
-    """
+    return server.receive_leader_command(request_json)
 
-    return jsonify(False)
+@app.route('/command', methods=['GET'])
+def get_command():
+    if server.state is State.FOLLOWER:
+        leader_id = server.votedFor
+        return redirect("http://{}:{}/command".format(leader_id['host'],\
+                                                      leader_id['port']),\
+                        code=302)
+    elif server.state is State.CANDIDATE:
+        return jsonify(False)
+    else:
+        return server.execute_commande(request.json)
 
 # Load the pickle files
 actions = pickle.load(open("data/actions.pickle", "rb"))
