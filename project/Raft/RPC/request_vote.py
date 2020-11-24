@@ -1,6 +1,3 @@
-from ..Server.state import State
-import json
-
 
 class VoteRequest:
     """

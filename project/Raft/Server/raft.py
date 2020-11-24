@@ -1,4 +1,4 @@
-# Flask for each FLight Computer. The server implements Raft Consensus Algorithm
+# Flask for each FLight Computer. The raft server implements Raft Consensus Algorithm
 
 # TODO: Valeur index
 
@@ -14,9 +14,9 @@ import math
 import threading
 import logging
 
-class Server:
+class Raft:
     def __init__(self, rocket, id, peers=[]):
-        # Common to all server
+        # Common to all raft server
         self.state = State.FOLLOWER
         self.currentTerm = 1
         self.votedFor = None
@@ -52,7 +52,7 @@ class Server:
             matchIndex[(peer['host'], peer['port'])] = 0
         return matchIndex
 
-    def start_server(self):
+    def start_raft(self):
         self.election_timer.start()
 
     def init_vote(self):
@@ -69,7 +69,7 @@ class Server:
             return
         else:
             # Start an election
-            print("The server http://{}:{}/ has an election timeout".format(self.id['host'], self.id['port']))
+            print("The raft server http://{}:{}/ has an election timeout".format(self.id['host'], self.id['port']))
             self.init_vote()
             # Goes to CANDIDATE state
             self.state = State.CANDIDATE
@@ -125,7 +125,7 @@ class Server:
 
     def _become_leader(self):
         if self.state == State.CANDIDATE:
-            print("Server {}:{} is now a leader. Congrats.".format(self.id['host'], self.id['port']))
+            print("Raft server {}:{} is now a leader. Congrats.".format(self.id['host'], self.id['port']))
             # Update variables
             self.state = State.LEADER
             for peer in self.rocket.get_peers():
@@ -138,20 +138,20 @@ class Server:
 
     def decide_vote(self, request_json):
         """
-        Server deciding a vote request from a candidate
+        Raft server deciding a vote request from a candidate
         """
         answer = None
 
         if self.currentTerm < request_json['term']:
-            # Ensure that the server stays or become a follower in this case
+            # Ensure that the raft server stays or become a follower in this case
             self._become_follower(request_json['term'])
 
         if request_json['term'] == self.currentTerm and \
         self._check_consistent_vote(request_json['candidateID']) and \
         self._check_election_log_safety(request_json['lastLogTerm'], \
                                        request_json['lastLogIndex']):
-            # The server grant this candidate
-            print("Server http://{}:{} voted for server http://{}:{}"\
+            # The raft server grant this candidate
+            print("Raft server http://{}:{} voted for the raft server http://{}:{}"\
             .format(self.id['host'],
                     self.id['port'],
                     request_json['candidateID']['host'],
@@ -160,7 +160,7 @@ class Server:
                                         self.currentTerm).__dict__)
             self._grant_vote(request_json['term'], request_json['candidateID'])
         else:
-            # The FOLLOWER server cannot grant this candidate
+            # The FOLLOWER raft server cannot grant this candidate
             answer = jsonify(VoteAnswer(False,
                                         self.currentTerm).__dict__)
 
@@ -179,14 +179,14 @@ class Server:
 
     def _check_consistent_vote(self, candidateID):
         if self.votedFor is None or self.votedFor is candidateID:
-            # The server has not voted yet, or already voted for this candidate
+            # The raft server has not voted yet, or already voted for this candidate
             return True
-        # The server cannot vote for this candidate
+        # The raft server cannot vote for this candidate
         return False
 
     def _check_election_log_safety(self, lastLogTerm, lastLogIndex):
         """
-        Check if a the last log of the server is as up-to-date than the last
+        Check if a the last log of the raft server is as up-to-date than the last
         log of the candidate.
         return True if last log is up-to-date with the candidate
                False otherwise
@@ -293,13 +293,3 @@ class Server:
 
     def _get_id_tuple(self, peer):
         return (peer['host'], peer['port'])
-
-    def commitmend_extraCondition(self):
-        """
-        Election Safety:
-        Leader Append-Only:
-        Log Matching:
-        Leader Completeness:
-        State Machine Safety:
-        """
-        pass

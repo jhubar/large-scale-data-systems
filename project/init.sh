@@ -12,7 +12,7 @@ fi
 
 if ! [ $2 ];
 then
-  flight_computers=3
+  flight_computers=5
 fi
 
 port=8000
@@ -23,6 +23,6 @@ for i in `seq 1 $flight_computers`;
 do
   echo $i
   let "current_port = port + i"
-  python flask_raft.py  --port $current_port --host $host &
+  python run_server.py  --port $current_port --host $host &
   echo "kill $!" >> kill.sh 2>&1
 done
