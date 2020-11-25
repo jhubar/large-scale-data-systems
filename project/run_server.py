@@ -26,20 +26,20 @@ def vote_request():
               least as up-to-date as receiver’s log, grant vote
     """
     request_json = request.json
-    return raft.decide_vote(request_json)
+    return jsonify(raft.decide_vote(request_json))
 
 @app.route('/append_entries', methods=['POST'])
 def append_entries():
     request_json = request.json
     return jsonify(raft.receive_leader_command(request_json))
 
-@app.route('/command', methods=['GET'])
+@app.route('/command', methods=['POST'])
 def get_command():
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         return redirect("http://{}:{}/command".format(leader_id['host'],\
                                                       leader_id['port']),\
-                        code=302)
+                        code=307)
     elif raft.state is State.CANDIDATE:
         return jsonify(False)
     else:

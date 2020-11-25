@@ -12,7 +12,7 @@ fi
 
 if ! [ $2 ];
 then
-  flight_computers=5
+  flight_computers=3
 fi
 
 port=8000
