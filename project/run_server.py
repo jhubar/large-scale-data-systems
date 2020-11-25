@@ -3,7 +3,7 @@
 import argparse
 import sys
 import json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 import logging
 from Raft.Server.raft import Raft
 from Raft.Server.state import State

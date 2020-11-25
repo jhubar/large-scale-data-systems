@@ -31,8 +31,9 @@ class Raft:
         self.rocket = rocket
         # Flask information
         self.id = id
-        self.election_timer = RaftRandomTime(0.15, 0.3, self.time_out)
         # Raft information
+        self.election_timer = RaftRandomTime(0.15, 0.3, self.time_out)
+        self.append_entries_timer = self._init_append_entries_timer(peers)
         self.vote = 0
         self.majority = math.floor((len(peers) + 1) / 2) + 1
         for peer in peers:
@@ -47,14 +48,21 @@ class Raft:
         nextIndex = {}
         for peer in peers:
             # TODO: maybe 0
-            nextIndex[(peer['host'], peer['port'])] = 1
+            nextIndex[self._get_id_tuple(peer)] = 1
         return nextIndex
 
     def _init_match_index(self, peers):
         matchIndex = {}
         for peer in peers:
-            matchIndex[(peer['host'], peer['port'])] = 0
+            matchIndex[self._get_id_tuple(peer)] = 0
         return matchIndex
+
+    def _init_append_entries_timer(self, peers):
+        append_entries_timer = {}
+        for peer in peers:
+            append_entries_timer[self._get_id_tuple(peer)] = \
+                RaftTimer(0.05, self._send_append_entries, args=(peer,))
+        return append_entries_timer
 
     def start_raft(self):
         self.election_timer.start()
@@ -114,35 +122,6 @@ class Raft:
                         self._become_follower(reply.json()['term'])
                 return
 
-    def _become_follower(self, term):
-        """
-        Cancel the election of a candidate
-        """
-        # Update variables and then reset the election time
-        self.currentTerm = term
-        self.state = State.FOLLOWER
-        self.votedFor = None
-        self.vote = 0
-        self.reset_election_timer()
-        if self.lock_append_entries.locked():
-            self.lock_append_entries.release()
-        if self.become_leader_lock.locked():
-            self.become_leader_lock.release()
-
-    def _become_leader(self):
-        self.become_leader_lock.acquire()
-        if self.state == State.CANDIDATE:
-            print("Raft server {}:{} is now a leader. Congrats.".format(self.id['host'], self.id['port']))
-            # Update variables
-            self.state = State.LEADER
-            for peer in self.rocket.get_peers():
-                self.nextIndex[(peer['host'], peer['port'])] = self.commitIndex + 1
-                self.matchIndex[(peer['host'], peer['port'])] = self.commitIndex
-                threading.Thread(target=self._send_append_entries,
-                                 args=(peer,)).start()
-            self.become_leader_lock.release()
-
-
     def decide_vote(self, request_json):
         """
         Raft server deciding a vote request from a candidate
@@ -172,6 +151,33 @@ class Raft:
                                         self.currentTerm).__dict__)
 
         return answer
+
+    def _become_follower(self, term):
+        """
+        Cancel the election of a candidate
+        """
+        # Update variables and then reset the election time
+        self.currentTerm = term
+        self.state = State.FOLLOWER
+        self.votedFor = None
+        self.vote = 0
+        self.reset_election_timer()
+        if self.lock_append_entries.locked():
+            self.lock_append_entries.release()
+        if self.become_leader_lock.locked():
+            self.become_leader_lock.release()
+
+    def _become_leader(self):
+        self.become_leader_lock.acquire()
+        if self.state == State.CANDIDATE:
+            print("Raft server {}:{} is now a leader. Congrats.".format(self.id['host'], self.id['port']))
+            # Update variables
+            self.state = State.LEADER
+            for peer in self.rocket.get_peers():
+                self.nextIndex[self._get_id_tuple(peer)] = self.commitIndex + 1
+                self.matchIndex[self._get_id_tuple(peer)] = self.commitIndex
+                self.append_entries_timer[self._get_id_tuple(peer)].start()
+            self.become_leader_lock.release()
 
     def _grant_vote(self, term, candidateID):
         """
@@ -211,11 +217,32 @@ class Raft:
     """
     AppendEntries Handler
     """
+
     def execute_commande(self, request_json):
         self.lock_append_entries.acquire()
         self.log.append(self.currentTerm, request_json['command'])
         self.lock_append_entries.release()
         return True
+
+    def receive_leader_command(self, request_json):
+        if request_json['term'] > self.currentTerm:
+            self._become_follower(request_json['term'])
+        if request_json['term'] < self.currentTerm:
+            return AppendEntriesAnswer(self.currentTerm, False, -1).__dict__
+        else:
+            index = 0
+            prevLogIndex = request_json['prevLogIndex']
+            prevLogTerm = request_json['prevLogTerm']
+            success = prevLogIndex == 0 or \
+             (prevLogIndex <= self._last_log_index() and \
+             self.log[prevLogIndex].term == prevLogTerm )
+            if success:
+                # Reset timer only if success
+                self.reset_election_timer()
+                index = self._store_entries(prevLogIndex,
+                                            request_json['entries'],
+                                            request_json['commitIndex'])
+            return AppendEntriesAnswer(self.currentTerm, success, index).__dict__
 
     def _send_append_entries(self, peer):
 
@@ -226,24 +253,23 @@ class Raft:
                 release lock
         """
         url = 'append_entries'
-        while self.state == State.LEADER:
-            # Take lock just for atomic reading in self.log
+        if self.state == State.LEADER:
             prevLogIndex = min(self.nextIndex[self._get_id_tuple(peer)], self._last_log_index())
             self.nextIndex[self._get_id_tuple(peer)] = prevLogIndex
             message = AppendEntriesRequest(self.currentTerm,
                                            self.id,
                                            prevLogIndex - 1,
-                                           self.log[prevLogIndex -1].term if self.log else 1,
-                                           self.log,
+                                           self.log[prevLogIndex - 1].term if self.log else 1,
+                                           self.log[(prevLogIndex - 1):],
                                            self.commitIndex).get_message()
             reply = send_post(peer, url, message)
-            # TODO: Analyser réponse follower
             if reply is not None and self.state is State.LEADER:
                 self._append_entries_answer(reply.json(), peer)
+            self.append_entries_timer[self._get_id_tuple(peer)].reset()
 
     def _append_entries_answer(self, reply_json, peer):
         """
-        when leader re-send
+        when leader receives follower answer
         """
         if reply_json['term'] > self.currentTerm:
             self._become_follower(reply_json['term'])
@@ -266,28 +292,6 @@ class Raft:
 
         self.commitIndex = min(commitIndex, index)
         return index
-
-
-    def receive_leader_command(self, request_json):
-        if request_json['term'] > self.currentTerm:
-            self._become_follower(request_json['term'])
-        if request_json['term'] < self.currentTerm:
-            return AppendEntriesAnswer(self.currentTerm, False, -1).__dict__
-        else:
-            index = 0
-            prevLogIndex = request_json['prevLogIndex']
-            prevLogTerm = request_json['prevLogTerm']
-            success = prevLogIndex == 0 or \
-             (prevLogIndex <= self._last_log_index() and \
-             self.log[prevLogIndex].term == prevLogTerm )
-            if success:
-                # Reset timer only if success
-                self.reset_election_timer()
-                index = self._store_entries(prevLogIndex,
-                                            request_json['entries'],
-                                            request_json['commitIndex'])
-            return AppendEntriesAnswer(self.currentTerm, success, index).__dict__
-
 
 
     """

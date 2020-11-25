@@ -19,8 +19,8 @@ class RaftRandomTime:
 
     def start(self):
         self.timer = threading.Timer(self._set_raft_time(),
-                                    self.function,
-                                    args=self.args)
+                                     self.function,
+                                     args=self.args)
         self.timer.start()
 
     def reset(self):
@@ -37,8 +37,9 @@ class RaftTimer:
 
     def start(self):
         self.timer = threading.Timer(self.time,
-                                    self.function,
-                                    args=self.args)
+                                     self.function,
+                                     args=self.args)
+        self.timer.start()
 
     def reset(self):
         self.timer.cancel()
