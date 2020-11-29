@@ -5,7 +5,8 @@
 
 # Report project
 
-[Project 1](https://www.overleaf.com/9156998969qgmvtwgyjsgt)
+[Reading assigment](https://www.overleaf.com/9156998969qgmvtwgyjsgt)
+[Raft Concensus](https://www.overleaf.com/5966248671dhqkdgssgxvr)
 
 # Authors
 1. [François Lievens](https://github.com/francoislievens)
