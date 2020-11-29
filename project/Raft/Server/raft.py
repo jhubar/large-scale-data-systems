@@ -35,6 +35,7 @@ class Raft:
         # Various variable (Locks, etc)
         self.lock_append_entries = threading.Lock()
         self.become_leader_lock = threading.Lock()
+        self.update_commit_lock = threading.Lock()
         # Only Leader handles these variables
         self.nextIndex = self._init_next_index(peers)
         self.matchIndex = self._init_match_index(peers)
@@ -162,6 +163,8 @@ class Raft:
             self.lock_append_entries.release()
         if self.become_leader_lock.locked():
             self.become_leader_lock.release()
+        if self.update_commit_lock.locked():
+            self.update_commit_lock.release()
 
     def _become_leader(self):
         self.become_leader_lock.acquire()
@@ -275,25 +278,28 @@ class Raft:
         """
         when leader receives follower answer
         """
-        print(reply_json)
         if reply_json['term'] > self.currentTerm:
             self._become_follower(reply_json['term'])
         elif self.state == State.LEADER and reply_json['term'] == self.currentTerm:
             if reply_json['success']:
-                 self.nextIndex[self._get_id_tuple(peer)] =\
-                                                reply_json['index'] + 1
-                 self.matchIndex[self._get_id_tuple(peer)] = reply_json['index']
-                 self._update_commit()
+                if self.nextIndex[self._get_id_tuple(peer)] < reply_json['index'] + 1:
+                     self.nextIndex[self._get_id_tuple(peer)] =\
+                                                    reply_json['index'] + 1
+                     self.matchIndex[self._get_id_tuple(peer)] = reply_json['index']
+                     self._update_commit(reply_json['index'])
             else:
                  self.nextIndex[self._get_id_tuple(peer)] =\
                     max(1, self.nextIndex[self._get_id_tuple(peer)] - 1)
 
 
-    def _update_commit(self):
-        counter = Counter(self.matchIndex.values())
-        value, count = counter.most_common()[0]
-        if value > self.commitIndex and count >= self.majority and self._get_term_by_index(value) is self.currentTerm:
-            self.commitIndex = value
+    def _update_commit(self, index):
+        self.update_commit_lock.acquire()
+        if index > self.commitIndex:
+            count = len([value for value in self.matchIndex.values() if value >= index])
+            if count >= self.majority and \
+                    self._get_term_by_index(index) == self.currentTerm:
+                self.commitIndex = index
+        self.update_commit_lock.release()
 
     """
     Various function
