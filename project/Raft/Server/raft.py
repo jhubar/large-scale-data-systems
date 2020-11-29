@@ -216,10 +216,14 @@ class Raft:
     """
 
     def execute_commande(self, request_json):
+        # Acquire lock
         self.lock_append_entries.acquire()
+        # Add to log
         self.log.append(Log(self.currentTerm, request_json['command']))
+        # Update matchIndex for the leader
         self.matchIndex[self._get_id_tuple(self.id)] =\
             self.matchIndex[self._get_id_tuple(self.id)] + 1
+        # Update nextIndex for the leader
         self.nextIndex[self._get_id_tuple(self.id)] =\
             self.nextIndex[self._get_id_tuple(self.id)] + 1
         self.lock_append_entries.release()
@@ -255,7 +259,8 @@ class Raft:
             index = index + 1
             self.log = self.log[0:index]
 
-        self.commitIndex = min(commitIndex, index)
+        if commitIndex > self.commitIndex:
+            self.commitIndex = min(commitIndex, index)
         return index
 
     def _send_append_entries(self, peer):
