@@ -45,7 +45,6 @@ class Raft:
         nextIndex = {}
         nextIndex[self._get_id_tuple(self.id)] = 1
         for peer in peers:
-            # TODO: maybe 0
             nextIndex[self._get_id_tuple(peer)] = 1
         return nextIndex
 
@@ -298,13 +297,13 @@ class Raft:
 
 
     def _update_commit(self, index):
-        self.update_commit_lock.acquire()
         if index > self.commitIndex:
+            self.update_commit_lock.acquire()
             count = len([value for value in self.matchIndex.values() if value >= index])
             if count >= self.majority and \
                     self._get_term_by_index(index) == self.currentTerm:
                 self.commitIndex = index
-        self.update_commit_lock.release()
+            self.update_commit_lock.release()
 
     """
     Various function
