@@ -1,5 +1,6 @@
 import numpy as np
 import time
+ 
 
 
 
@@ -128,25 +129,25 @@ class FlightComputer:
 
         return decided
 
-    def acceptable_state(self, state):
-        return True
-
-    def acceptable_action(self, action):
-        our_action = self.sample_next_action()
-        accept = True
-        for k in our_action.keys():
-            if our_action[k] != action[k]:
-                accept = False
-
-        return accept
-
-    def deliver_action(self, action):
-        if "next_stage" in action and action["next_stage"]:
-            self.current_stage_index += 1
-            self.stage_handler = self.stage_handlers[self.current_stage_index]
-
-    def deliver_state(self, state):
-        self.state = state
+    # def acceptable_state(self, state):
+    #     return True
+    #
+    # def acceptable_action(self, action):
+    #     our_action = self.sample_next_action()
+    #     accept = True
+    #     for k in our_action.keys():
+    #         if our_action[k] != action[k]:
+    #             accept = False
+    #
+    #     return accept
+    #
+    # def deliver_action(self, action):
+    #     if "next_stage" in action and action["next_stage"]:
+    #         self.current_stage_index += 1
+    #         self.stage_handler = self.stage_handlers[self.current_stage_index]
+    #
+    # def deliver_state(self, state):
+    #     self.state = state
 
 
 
