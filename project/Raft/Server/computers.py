@@ -1,6 +1,6 @@
 import numpy as np
 import time
- 
+
 
 
 
@@ -104,50 +104,37 @@ class FlightComputer:
     def _handle_stage_9(self):
         self.completed = True
 
+    """ With Raft it is now a command """
+
     def sample_next_action(self):
         return self.stage_handler()
 
-    def decide_on_state(self, state):
-        acceptations = [p.acceptable_state(state) for p in self.peers]
-        decided = sum(acceptations) / (len(self.peers) + 1) > 0.5
+    def acceptable_command(self, state, action):
+        return self._acceptable_state(state) and self._acceptable_action(action)
 
-        if decided:
-            for p in self.peers:
-                p.deliver_state(state)
-            self.deliver_state(state)
+    def _acceptable_state(self, state):
+        return True
 
-        return decided
+    def _acceptable_action(self, action):
+        our_action = self.sample_next_action()
+        accept = True
+        for k in our_action.keys():
+            if our_action[k] != action[k]:
+                accept = False
 
-    def decide_on_action(self, action):
-        acceptations = [p.acceptable_action(action) for p in self.peers]
-        decided = sum(acceptations) / (len(self.peers) + 1) > 0.5
+        return accept
 
-        if decided:
-            for p in self.peers:
-                p.deliver_action(action)
-            self.deliver_action(action)
+    def deliver_command(self, state, action):
+        self._deliver_state(state)
+        self._deliver_action(action)
 
-        return decided
+    def _deliver_action(self, action):
+        if "next_stage" in action and action["next_stage"]:
+            self.current_stage_index += 1
+            self.stage_handler = self.stage_handlers[self.current_stage_index]
 
-    # def acceptable_state(self, state):
-    #     return True
-    #
-    # def acceptable_action(self, action):
-    #     our_action = self.sample_next_action()
-    #     accept = True
-    #     for k in our_action.keys():
-    #         if our_action[k] != action[k]:
-    #             accept = False
-    #
-    #     return accept
-    #
-    # def deliver_action(self, action):
-    #     if "next_stage" in action and action["next_stage"]:
-    #         self.current_stage_index += 1
-    #         self.stage_handler = self.stage_handlers[self.current_stage_index]
-    #
-    # def deliver_state(self, state):
-    #     self.state = state
+    def _deliver_state(self, state):
+        self.state = state
 
 
 
@@ -200,9 +187,7 @@ class CrashingFlightComputer(FlightComputer):
 
         return action
 
-
-
-def allocate_random_flight_computer(state):
+def allocate_random_flight_computer():
     computers = [
         FullThrottleFlightComputer,
         RandomThrottleFlightComputer,
@@ -210,4 +195,4 @@ def allocate_random_flight_computer(state):
         CrashingFlightComputer,
     ]
 
-    return computers[np.random.randint(0, len(computers))](state)
+    return computers[np.random.randint(0, len(computers))]

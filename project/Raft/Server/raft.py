@@ -12,6 +12,13 @@ import math
 import threading
 import logging
 import time
+import pickle
+from enum import Enum
+
+# Load the pickle files
+actions = pickle.load(open("data/actions.pickle", "rb"))
+states = pickle.load(open("data/states.pickle", "rb"))
+timestep = 0
 
 class Raft:
     def __init__(self, rocket, id, peers=[]):
@@ -23,7 +30,7 @@ class Raft:
         self.commitIndex = 0
         self.lastApplied = 0
         # Flight Computer object
-        self.rocket = rocket
+        self.rocket = rocket(states[0])
         # Flask information
         self.id = id
         # Raft information
@@ -63,6 +70,7 @@ class Raft:
         return append_entries_timer
 
     def start_raft(self):
+        threading.Thread(target=self._execute_command).start()
         self.election_timer.start()
 
     def init_vote(self):
@@ -214,23 +222,29 @@ class Raft:
     AppendEntries Handler
     """
 
-    def execute_commande(self, request_json):
+    def add_entries(self):
         # Acquire lock
         self.lock_append_entries.acquire()
         # Add to log
-        self.log.append(Log(self.currentTerm, request_json['command']))
-        # Update matchIndex for the leader
-        self.matchIndex[self._get_id_tuple(self.id)] =\
-            self.matchIndex[self._get_id_tuple(self.id)] + 1
-        # Update nextIndex for the leader
-        self.nextIndex[self._get_id_tuple(self.id)] =\
-            self.nextIndex[self._get_id_tuple(self.id)] + 1
+        command = {}
+        command['state'] = states[self.nextIndex[self._get_id_tuple(self.id)]]
+        command['action'] = self.rocket.sample_next_action()
+        if command['action'] is not None:
+            self.log.append(Log(self.currentTerm, command))
+            # Update matchIndex for the leader
+            appliedIndex = self.matchIndex[self._get_id_tuple(self.id)]
+            self.matchIndex[self._get_id_tuple(self.id)] =\
+                self.matchIndex[self._get_id_tuple(self.id)] + 1
+            # Update nextIndex for the leader
+            self.nextIndex[self._get_id_tuple(self.id)] =\
+                self.nextIndex[self._get_id_tuple(self.id)] + 1
+            while self.lastApplied < appliedIndex + 1:
+                continue
         self.lock_append_entries.release()
-        # TODO: Normaly it should return something else here. (Like the results of the command)
         return True
 
     def receive_leader_command(self, request_json):
-        print('Received append entries: {}'.format(request_json))
+        #print('Received append entries: {}'.format(request_json))
         if request_json['term'] > self.currentTerm:
             self._become_follower(request_json['term'])
         if request_json['term'] < self.currentTerm:
@@ -239,28 +253,46 @@ class Raft:
             index = 0
             prevLogIndex = request_json['prevLogIndex']
             prevLogTerm = request_json['prevLogTerm']
-            success = prevLogIndex == 0 or \
+            success_raft = prevLogIndex == 0 or \
              (prevLogIndex <= self._last_log_index() and \
              self._get_term_by_index(prevLogIndex) == prevLogTerm)
-            if success:
-                # Reset timer only if success
-                self.reset_election_timer()
-                index = self._store_entries(prevLogIndex,
-                                            request_json['entries'],
-                                            request_json['commitIndex'])
-            return AppendEntriesAnswer(self.currentTerm, success, index).__dict__
+            rocket_flag = False
+            if success_raft:
+                # Reset timer only if success_raft
+                index, rocket_flag = self._store_entries(prevLogIndex,
+                                                         request_json['entries'],
+                                                         request_json['commitIndex'])
+                if rocket_flag:
+                    # Reset only if rocket is ok with the current command
+                    self.reset_election_timer()
+            return AppendEntriesAnswer(self.currentTerm,
+                                       success_raft,
+                                       index,
+                                       rocket_flag).__dict__
 
     def _store_entries(self, prevLogIndex, entries, commitIndex):
         index = prevLogIndex
+        rocket_flag = True
+        self.log = self.log[0:index]
         for json_log in entries:
             log_received = Log(json_log['term'], json_log['command'])
-            self.log.insert(index, log_received)
-            index = index + 1
-            self.log = self.log[0:index]
+            # Here check if acceptable command
+            state = log_received.command['state']
+            action = log_received.command['action']
+            rocket_flag = self.rocket.acceptable_command(state, action)
+            # We can say it is ok for the this rocket
+            if commitIndex > index or rocket_flag:
+                # It means the leader replicated this command with majority
+                # Force anyway on this rocket
+                self.log.insert(index, log_received)
+                index = index + 1
+            elif not rocket_flag:
+                # Stop! This rocket refuses the command
+                break
 
         if commitIndex > self.commitIndex:
             self.commitIndex = min(commitIndex, index)
-        return index
+        return index, rocket_flag
 
     def _send_append_entries(self, peer):
         url = 'append_entries'
@@ -282,18 +314,21 @@ class Raft:
         """
         when leader receives follower answer
         """
+        print(reply_json)
         if reply_json['term'] > self.currentTerm:
             self._become_follower(reply_json['term'])
         elif self.state == State.LEADER and reply_json['term'] == self.currentTerm:
-            if reply_json['success']:
+            if reply_json['success'] and reply_json['rocket_flag']:
                 if self.nextIndex[self._get_id_tuple(peer)] < reply_json['index'] + 1:
                      self.nextIndex[self._get_id_tuple(peer)] =\
                                                     reply_json['index'] + 1
                      self.matchIndex[self._get_id_tuple(peer)] = reply_json['index']
                      self._update_commit(reply_json['index'])
             else:
-                 self.nextIndex[self._get_id_tuple(peer)] =\
+                self.nextIndex[self._get_id_tuple(peer)] =\
                     max(1, self.nextIndex[self._get_id_tuple(peer)] - 1)
+                self.matchIndex[self._get_id_tuple(peer)] =\
+                    max(0, self.matchIndex[self._get_id_tuple(peer)] - 1)
 
 
     def _update_commit(self, index):
@@ -304,6 +339,19 @@ class Raft:
                     self._get_term_by_index(index) == self.currentTerm:
                 self.commitIndex = index
             self.update_commit_lock.release()
+
+    def _execute_command(self):
+        print("Rocket {}:{} is waiting to execute new command".format(self.id['host'], self.id['port']))
+        while True:
+            while self.lastApplied < self.commitIndex:
+                print("Applying a new command")
+                command = self.log[self.lastApplied].command
+                self.rocket.deliver_command(command['state'], command['action'])
+                if self.rocket.sample_next_action() is None:
+                    print("Rocket with id {}:{} successfully landed!".format(self.id['host'], self.id['port']))
+                    print("Stopping execution of command...")
+                    return
+                self.lastApplied += 1
 
     """
     Various function

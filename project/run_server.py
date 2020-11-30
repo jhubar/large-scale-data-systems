@@ -7,8 +7,7 @@ from flask import Flask, request, jsonify, redirect
 import logging
 from Raft.Server.raft import Raft
 from Raft.Server.state import State
-import pickle
-from starter_code.computers import FlightComputer
+from Raft.Server.computers import *
 
 raft = None
 
@@ -43,12 +42,8 @@ def get_command():
     elif raft.state is State.CANDIDATE:
         return jsonify(False)
     else:
-        return jsonify(raft.execute_commande(request.json))
+        return jsonify(raft.add_entries())
 
-# Load the pickle files
-actions = pickle.load(open("data/actions.pickle", "rb"))
-states = pickle.load(open("data/states.pickle", "rb"))
-timestep = 0
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -82,8 +77,7 @@ if __name__ == '__main__':
     if peers is None:
         sys.exit()
     # Initialise the flight computers and the raft. Then start the raft
-    fc = FlightComputer(states[timestep])
-    raft = Raft(fc, raft_id, peers)
+    raft = Raft(FlightComputer, raft_id, peers)
     raft.start_raft()
     # Run Flask app
     app.run(debug=False, host=arguments.host, port=arguments.port)
