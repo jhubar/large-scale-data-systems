@@ -335,7 +335,7 @@ class Raft:
         # Acquire lock
         with self.add_entries_lock:
             # Add state to log and tries to apply to each follower
-            while self.timestep < len(actions):
+            while self.timestep < len(actions) or self.state is State.LEADER:
                 # TODO: refaire la fonction pour matcher avec le cas réel, i.e leader devient follower
                 self.timestep += 1
                 command = {}
@@ -344,6 +344,8 @@ class Raft:
                 self.log.append(entry)
                 # Wait majority
                 self._wait_majority()
+                if self.state != State.LEADER:
+                    return
                 # Leader can deliver state because of the majority
                 self._deliver_command(entry)
 
@@ -359,6 +361,8 @@ class Raft:
                 self.log.append(entry)
                 # Wait majority
                 self._wait_majority()
+                if self.state != State.LEADER:
+                    return
                 # Leader can deliver action because of the majority
                 self._deliver_command(entry)
                 # Check Action
@@ -379,7 +383,7 @@ class Raft:
         for peer in self.rocket.get_peers():
             threading.Thread(target=self._send_append_entries,
                              args=(peer,)).start()
-        while self.commitIndex <= currentCommitIndex:
+        while self.commitIndex <= currentCommitIndex or self.state is State.LEADER:
             # Loop while command not replicated
             continue
 
