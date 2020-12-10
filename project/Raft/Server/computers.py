@@ -104,18 +104,13 @@ class FlightComputer:
     def _handle_stage_9(self):
         self.completed = True
 
-    """ With Raft it is now a command """
-
     def sample_next_action(self):
         return self.stage_handler()
 
-    def acceptable_command(self, state, action):
-        return self._acceptable_state(state) and self._acceptable_action(action)
-
-    def _acceptable_state(self, state):
+    def acceptable_state(self, state):
         return True
 
-    def _acceptable_action(self, action):
+    def acceptable_action(self, action):
         our_action = self.sample_next_action()
         accept = True
         for k in our_action.keys():
@@ -124,16 +119,12 @@ class FlightComputer:
 
         return accept
 
-    def deliver_command(self, state, action):
-        self._deliver_state(state)
-        self._deliver_action(action)
-
-    def _deliver_action(self, action):
+    def deliver_action(self, action):
         if "next_stage" in action and action["next_stage"]:
             self.current_stage_index += 1
             self.stage_handler = self.stage_handlers[self.current_stage_index]
 
-    def _deliver_state(self, state):
+    def deliver_state(self, state):
         self.state = state
 
 
