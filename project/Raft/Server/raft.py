@@ -188,19 +188,19 @@ class Raft:
                 self.append_entries_lock[self._get_id_tuple(peer)].release()
 
     def _become_leader(self):
-        self.become_leader_lock.acquire()
-        if self.state == State.CANDIDATE:
-            print("Raft server {}:{} is now a leader. Congrats."\
-                                    .format(self.id['host'], self.id['port']))
-            # Update variables
-            self.state = State.LEADER
-            for peer in self.rocket.get_peers():
-                self.nextIndex[self._get_id_tuple(peer)] =\
-                                                self._last_log_index() + 1
-                self.matchIndex[self._get_id_tuple(peer)] = 0
-                # Start heartbeat
-                self.append_entries_timer[self._get_id_tuple(peer)].start()
-            self.become_leader_lock.release()
+        with self.become_leader_lock:
+            if self.state == State.CANDIDATE:
+                print("Raft server {}:{} is now a leader. Congrats."\
+                                        .format(self.id['host'], self.id['port']))
+                # Update variables
+                self.state = State.LEADER
+                threading.Thread(target=self.add_entries).start()
+                for peer in self.rocket.get_peers():
+                    self.nextIndex[self._get_id_tuple(peer)] =\
+                                                    self._last_log_index() + 1
+                    self.matchIndex[self._get_id_tuple(peer)] = 0
+                    # Start heartbeat
+                    self.append_entries_timer[self._get_id_tuple(peer)].start()
 
     def _grant_vote(self, term, candidateID):
         """
@@ -339,7 +339,6 @@ class Raft:
         with self.add_entries_lock:
             # Check which command (State or Action) to send
             while self.timestep < len(actions) or self.state is State.LEADER:
-                time.sleep(0.25)
                 last_entry = self._get_last_log()
                 command = {}
                 if last_entry is None or 'action' in last_entry.command:
