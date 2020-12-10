@@ -190,11 +190,13 @@ class Raft:
     def _become_leader(self):
         self.become_leader_lock.acquire()
         if self.state == State.CANDIDATE:
-            print("Raft server {}:{} is now a leader. Congrats.".format(self.id['host'], self.id['port']))
+            print("Raft server {}:{} is now a leader. Congrats."\
+                                    .format(self.id['host'], self.id['port']))
             # Update variables
             self.state = State.LEADER
             for peer in self.rocket.get_peers():
-                self.nextIndex[self._get_id_tuple(peer)] = self._last_log_index() + 1
+                self.nextIndex[self._get_id_tuple(peer)] =\
+                                                self._last_log_index() + 1
                 self.matchIndex[self._get_id_tuple(peer)] = 0
                 # Start heartbeat
                 self.append_entries_timer[self._get_id_tuple(peer)].start()
@@ -242,7 +244,7 @@ class Raft:
             return self._check_leader_command(request_json)
 
     def _check_leader_command(self, request_json):
-        #print(request_json)
+        print("Server received command from leader : {}".format(request_json))
         if request_json['term'] > self.currentTerm:
             self._become_follower(request_json['term'])
         if request_json['term'] < self.currentTerm:
@@ -261,9 +263,10 @@ class Raft:
             rocket_flag = False
             if success_raft:
                 # Check the command
-                index, rocket_flag = self._store_and_execute(prevLogIndex,
-                                                         request_json['entries'],
-                                                         request_json['commitIndex'])
+                index, rocket_flag =\
+                            self._store_and_execute(prevLogIndex,
+                                                    request_json['entries'],
+                                                    request_json['commitIndex'])
                 if rocket_flag:
                     # Reset only if rocket is ok with the current command
                     self.reset_election_timer()
@@ -334,40 +337,28 @@ class Raft:
             return
         # Acquire lock
         with self.add_entries_lock:
-            # Add state to log and tries to apply to each follower
+            # Check which command (State or Action) to send
             while self.timestep < len(actions) or self.state is State.LEADER:
-                # TODO: refaire la fonction pour matcher avec le cas réel, i.e leader devient follower
-                self.timestep += 1
+                time.sleep(0.25)
+                last_entry = self._get_last_log()
                 command = {}
-                command['state'] = states[self.timestep]
+                if last_entry is None or 'action' in last_entry.command:
+                    command['state'] = states[self.timestep]
+                else:
+                    command['action'] = self.rocket.sample_next_action()
                 entry = Log(self.currentTerm, command)
                 self.log.append(entry)
                 # Wait majority
                 self._wait_majority()
                 if self.state != State.LEADER:
+                    # Do nothing
                     return
                 # Leader can deliver state because of the majority
                 self._deliver_command(entry)
-
-                # Add the action now and start again communication
-                command.clear()
-                try:
-                    command['action'] = self.rocket.sample_next_action()
-                except Exception as e:
-                    # In case the flight computer crashed
-                    print(e)
-                    sys.exit(-1)
-                entry = Log(self.currentTerm, command)
-                self.log.append(entry)
-                # Wait majority
-                self._wait_majority()
-                if self.state != State.LEADER:
-                    return
-                # Leader can deliver action because of the majority
-                self._deliver_command(entry)
                 # Check Action
-                for k in command['action'].keys():
-                    assert(command['action'][k] == actions[self.timestep][k])
+                if 'action' in command:
+                    for k in command['action'].keys():
+                        assert(command['action'][k] == actions[self.timestep][k])
         return True
 
     def _wait_majority(self):
@@ -383,10 +374,11 @@ class Raft:
         for peer in self.rocket.get_peers():
             threading.Thread(target=self._send_append_entries,
                              args=(peer,)).start()
-        while self.commitIndex <= currentCommitIndex or self.state is State.LEADER:
-            # Loop while command not replicated
-            continue
-
+        while self.state is State.LEADER:
+            if self.commitIndex <= currentCommitIndex:
+                # Loop while command not replicated
+                continue
+            break
 
     def _send_append_entries(self, peer):
         with self.append_entries_lock[self._get_id_tuple(peer)]:
