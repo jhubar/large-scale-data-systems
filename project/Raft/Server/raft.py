@@ -416,12 +416,14 @@ class Raft:
         if reply_json['term'] > self.currentTerm:
             self._become_follower(reply_json['term'])
         elif self.state == State.LEADER and reply_json['term'] == self.currentTerm:
-            if reply_json['success'] and reply_json['rocket_flag']:
-                if self.nextIndex[self._get_id_tuple(peer)] < reply_json['index'] + 1:
-                     self.nextIndex[self._get_id_tuple(peer)] =\
-                                                    reply_json['index'] + 1
-                     self.matchIndex[self._get_id_tuple(peer)] = reply_json['index']
-                     self._update_commit(reply_json['index'])
+            if reply_json['success']:
+                if reply_json['rocket_flag']:
+                    if self.nextIndex[self._get_id_tuple(peer)] < reply_json['index'] + 1:
+                         self.nextIndex[self._get_id_tuple(peer)] =\
+                                                        reply_json['index'] + 1
+                         self.matchIndex[self._get_id_tuple(peer)] =\
+                                                        reply_json['index']
+                         self._update_commit(reply_json['index'])
             else:
                 self.nextIndex[self._get_id_tuple(peer)] =\
                     max(1, self.nextIndex[self._get_id_tuple(peer)] - 1)
