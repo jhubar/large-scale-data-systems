@@ -242,7 +242,7 @@ class Raft:
             return self._check_leader_command(request_json)
 
     def _check_leader_command(self, request_json):
-        print(request_json)
+        #print(request_json)
         if request_json['term'] > self.currentTerm:
             self._become_follower(request_json['term'])
         if request_json['term'] < self.currentTerm:
@@ -335,28 +335,35 @@ class Raft:
         # Acquire lock
         with self.add_entries_lock:
             # Add state to log and tries to apply to each follower
-            self.timestep += 1
-            command = {}
-            command['state'] = states[self.timestep]
-            entry = Log(self.currentTerm, command)
-            self.log.append(entry)
-            # Wait majority
-            self._wait_majority()
-            # Leader can deliver state because of the majority
-            self._deliver_command(entry)
+            while self.timestep < len(actions):
+                # TODO: refaire la fonction pour matcher avec le cas réel, i.e leader devient follower
+                self.timestep += 1
+                command = {}
+                command['state'] = states[self.timestep]
+                entry = Log(self.currentTerm, command)
+                self.log.append(entry)
+                # Wait majority
+                self._wait_majority()
+                # Leader can deliver state because of the majority
+                self._deliver_command(entry)
 
-            # Add the action now and start again communication
-            command.clear()
-            command['action'] = self.rocket.sample_next_action()
-            entry = Log(self.currentTerm, command)
-            self.log.append(entry)
-            # Wait majority
-            self._wait_majority()
-            # Leader can deliver action because of the majority
-            self._deliver_command(entry)
-            # Check Action
-            for k in command['action'].keys():
-                assert(command['action'][k] == actions[self.timestep][k])
+                # Add the action now and start again communication
+                command.clear()
+                try:
+                    command['action'] = self.rocket.sample_next_action()
+                except Exception as e:
+                    # In case the flight computer crashed
+                    print(e)
+                    sys.exit(-1)
+                entry = Log(self.currentTerm, command)
+                self.log.append(entry)
+                # Wait majority
+                self._wait_majority()
+                # Leader can deliver action because of the majority
+                self._deliver_command(entry)
+                # Check Action
+                for k in command['action'].keys():
+                    assert(command['action'][k] == actions[self.timestep][k])
         return True
 
     def _wait_majority(self):
