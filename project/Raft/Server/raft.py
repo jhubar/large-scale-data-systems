@@ -362,12 +362,12 @@ class Raft:
                 if 'action' in command:
                     try:
                         for k in command['action'].keys():
-                            assert(command['action'][k] == actions[self.timestep][k])
+                            assert(command['action'][k] == actions[self.timestep - 1][k])
                     except AssertionError as e:
                         print(e)
                         print("our action {}".format(command))
-                        print("the expected action {}".format(actions[self.timestep]))
-                        print("error at timestep = {}".format(self.timestep))
+                        print("the expected action {}".format(actions[self.timestep -1]))
+                        print("error at timestep = {}".format(self.timestep - 1))
                         os._exit(-1)
 
     def _wait_majority(self):
@@ -406,14 +406,17 @@ class Raft:
                 if reply is not None and self.state is State.LEADER:
                     self._append_entries_answer(reply.json(), peer)
                 # Reset the append entry timer (the heartbeat)
-                self.append_entries_timer[self._get_id_tuple(peer)].reset()
+                try:
+                    self.append_entries_timer[self._get_id_tuple(peer)].reset()
+                except Exception as e:
+                    return
 
 
     def _append_entries_answer(self, reply_json, peer):
         """
         when leader receives follower answer
         """
-        #print("Leader received reply {}\n".format(reply_json))
+        print("Leader received reply {}\n".format(reply_json))
         if reply_json['term'] > self.currentTerm:
             self._become_follower(reply_json['term'])
         elif self.state == State.LEADER and reply_json['term'] == self.currentTerm:
