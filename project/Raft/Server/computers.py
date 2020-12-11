@@ -120,12 +120,14 @@ class FlightComputer:
         return accept
 
     def deliver_action(self, action):
+        print("Action {} delivered\n".format(action))
         if "next_stage" in action and action["next_stage"]:
             self.current_stage_index += 1
             self.stage_handler = self.stage_handlers[self.current_stage_index]
             print("Entering stage number {}".format(self.current_stage_index))
 
     def deliver_state(self, state):
+        print("State {} delivered\n".format(state))
         self.state = state
 
 

@@ -77,7 +77,13 @@ if __name__ == '__main__':
     if peers is None:
         sys.exit()
     # Initialise the flight computers and the raft. Then start the raft
-    raft = Raft(FlightComputer, raft_id, peers)
+    fc = None
+    if arguments.flight_computers_type == 0:
+        fc = FlightComputer
+    else:
+        fc = allocate_random_flight_computer()
+    print(fc)
+    raft = Raft(fc, raft_id, peers)
     raft.start_raft()
     # Run Flask app
     app.run(debug=False, host=arguments.host, port=arguments.port)

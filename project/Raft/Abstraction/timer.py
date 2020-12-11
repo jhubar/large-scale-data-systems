@@ -12,7 +12,9 @@ class RaftRandomTime:
         self.max_time = max_time
         self.function = function
         self.args = args
-        self.timer = threading.Timer
+        self.timer = threading.Timer(self._set_raft_time(),
+                                     self.function,
+                                     args=self.args)
 
     def _set_raft_time(self):
         return random.random()*(self.max_time - self.min_time) + self.min_time
@@ -27,13 +29,14 @@ class RaftRandomTime:
         self.timer.cancel()
         self.start()
 
-
 class RaftTimer:
     def __init__(self, time, function, args=None):
         self.time = time
         self.function = function
         self.args = args
-        self.timer = threading.Timer
+        self.timer = threading.Timer(time,
+                                     self.function,
+                                     args=self.args)
 
     def start(self):
         self.timer = threading.Timer(self.time,
@@ -44,3 +47,13 @@ class RaftTimer:
     def reset(self):
         self.timer.cancel()
         self.start()
+
+    def reset_with_time(self, time):
+        self.timer.cancel()
+        self.start_with_time(time)
+
+    def start_with_time(self, time):
+        self.timer = threading.Timer(time,
+                                     self.function,
+                                     args=self.args)
+        self.timer.start()
