@@ -13,7 +13,7 @@ import threading
 import logging
 import time
 import pickle
-import os
+import os, signal
 import sys
 from enum import Enum
 
@@ -37,7 +37,7 @@ class Raft:
         # Flask information
         self.id = id
         # Raft information
-        self.election_timer = RaftRandomTime(0.5, 1.0, self.time_out, args=())
+        self.election_timer = RaftRandomTime(0.45, 0.9, self.time_out, args=())
         self.vote = 0
         self.majority = math.ceil((len(peers) + 1) / 2)
         for peer in peers:
@@ -52,6 +52,8 @@ class Raft:
         self.nextIndex = self._init_next_index(peers)
         self.matchIndex = self._init_match_index(peers)
         self.append_entries_timer = self._init_append_entries_timer(peers)
+        # Boolean that allows to know if rocket ends
+        self.is_done = False
         time.sleep(3)
 
     def _init_next_index(self, peers):
@@ -72,7 +74,7 @@ class Raft:
         append_entries_timer = {}
         for peer in peers:
             append_entries_timer[self._get_id_tuple(peer)] = \
-                RaftTimer(0.25, self._send_append_entries, args=(peer,))
+                RaftTimer(0.225, self._send_append_entries, args=(peer,))
         return append_entries_timer
 
     def _init_append_entries_lock(self, peers):
@@ -257,7 +259,7 @@ class Raft:
         return answer
 
     def _check_leader_command(self, request_json):
-        print("Server received command from leader : {}\n".format(request_json))
+        #print("Server received command from leader : {}\n".format(request_json))
         if request_json['term'] > self.currentTerm:
             self._become_follower(request_json['term'])
         if request_json['term'] < self.currentTerm:
@@ -323,6 +325,16 @@ class Raft:
     def _deliver_command(self, entry):
         if 'action' in entry.command:
             self.rocket.deliver_action(entry.command['action'])
+            # Check Action
+            try:
+                for k in entry.command['action'].keys():
+                    assert(entry.command['action'][k] == actions[self.timestep][k])
+            except AssertionError as e:
+                print(e)
+                print("our action {}".format(entry.command['action']))
+                print("the expected action {}".format(actions[self.timestep]))
+                print("error at timestep = {}".format(self.timestep))
+                os._exit(-1)
         else:
             self.rocket.deliver_state(entry.command['state'])
         # update timestep
@@ -346,16 +358,21 @@ class Raft:
         # Acquire lock
         with self.add_entries_lock:
             # Check which command (State or Action) to send
-            while self.state is State.LEADER and self.timestep < len(actions):
+            while self.state is State.LEADER and not self.is_done:
                 last_entry = self._get_last_log()
                 command = {}
                 if last_entry is None or 'action' in last_entry.command:
                     command['state'] = states[self.timestep]
                 else:
-                    command['action'] = self.rocket.sample_next_action()
+                    try:
+                        command['action'] = self.rocket.sample_next_action()
+                    except Exception as e:
+                        # If the computer crashed
+                        print(e)
+                        os._exit(-1)
                     if command['action'] is None:
+                        self.is_done = True
                         return
-                    #print("trying to deliver the action\n:{}".format(command))
                 entry = Log(self.currentTerm, command)
                 self.log.append(entry)
                 # Wait majority
@@ -365,17 +382,6 @@ class Raft:
                     break
                 # Leader can deliver state because of the majority
                 self._deliver_command(entry)
-                # Check Action
-                if 'action' in command:
-                    try:
-                        for k in command['action'].keys():
-                            assert(command['action'][k] == actions[self.timestep - 1][k])
-                    except AssertionError as e:
-                        print(e)
-                        print("our action {}".format(command))
-                        print("the expected action {}".format(actions[self.timestep -1]))
-                        print("error at timestep = {}".format(self.timestep - 1))
-                        os._exit(-1)
 
     def _wait_majority(self):
         # Update matchIndex for the leader
@@ -420,7 +426,7 @@ class Raft:
         """
         when leader receives follower answer
         """
-        print("Leader received reply {}\n".format(reply_json))
+        #print("Leader received reply {}\n".format(reply_json))
         if reply_json['term'] > self.currentTerm:
             self._become_follower(reply_json['term'])
         elif self.state == State.LEADER and reply_json['term'] == self.currentTerm:
