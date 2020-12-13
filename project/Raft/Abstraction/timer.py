@@ -13,17 +13,18 @@ class RaftRandomTime:
         self.function = function
         self.args = args
         self.timer = threading.Timer(self._set_raft_time(),
-                                     self.function,
-                                     args=self.args)
+                                     self.exec_function)
 
     def _set_raft_time(self):
         return random.random()*(self.max_time - self.min_time) + self.min_time
 
     def start(self):
         self.timer = threading.Timer(self._set_raft_time(),
-                                     self.function,
-                                     args=self.args)
+                                     self.exec_function)
         self.timer.start()
+
+    def exec_function(self):
+        threading.Thread(target=self.function, args=self.args).start()
 
     def reset(self):
         self.timer.cancel()
@@ -34,26 +35,23 @@ class RaftTimer:
         self.time = time
         self.function = function
         self.args = args
-        self.timer = threading.Timer(time,
-                                     self.function,
-                                     args=self.args)
+        self.timer = threading.Timer(time, self.exec_function)
 
     def start(self):
-        self.timer = threading.Timer(self.time,
-                                     self.function,
-                                     args=self.args)
+        self.timer = threading.Timer(self.time, self.exec_function)
         self.timer.start()
 
     def reset(self):
         self.timer.cancel()
         self.start()
 
+    def exec_function(self):
+        threading.Thread(target=self.function, args=self.args).start()
+
     def reset_with_time(self, time):
         self.timer.cancel()
         self.start_with_time(time)
 
     def start_with_time(self, time):
-        self.timer = threading.Timer(time,
-                                     self.function,
-                                     args=self.args)
+        self.timer = threading.Timer(time, self.exec_function)
         self.timer.start()

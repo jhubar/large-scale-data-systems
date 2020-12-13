@@ -37,7 +37,7 @@ class Raft:
         # Flask information
         self.id = id
         # Raft information
-        self.election_timer = RaftRandomTime(0.5, 1.0, self.time_out)
+        self.election_timer = RaftRandomTime(0.5, 1.0, self.time_out, args=())
         self.vote = 0
         self.majority = math.ceil((len(peers) + 1) / 2)
         for peer in peers:
@@ -179,17 +179,17 @@ class Raft:
         self.entry_buffered = None
         self.reset_election_timer()
         # release lock if needed
-        if self.add_entries_lock.locked():
-            self.add_entries_lock.release()
-        if self.leader_command_lock.locked():
-            self.leader_command_lock.release()
-        if self.become_leader_lock.locked():
-            self.become_leader_lock.release()
-        if self.update_commit_lock.locked():
-            self.update_commit_lock.release()
-        for peer in self.rocket.get_peers():
-            if self.append_entries_lock[self._get_id_tuple(peer)].locked():
-                self.append_entries_lock[self._get_id_tuple(peer)].release()
+        # if self.add_entries_lock.locked():
+        #     self.add_entries_lock.release()
+        # if self.leader_command_lock.locked():
+        #     self.leader_command_lock.release()
+        # if self.become_leader_lock.locked():
+        #     self.become_leader_lock.release()
+        # if self.update_commit_lock.locked():
+        #     self.update_commit_lock.release()
+        # for peer in self.rocket.get_peers():
+        #     if self.append_entries_lock[self._get_id_tuple(peer)].locked():
+        #         self.append_entries_lock[self._get_id_tuple(peer)].release()
 
     def _become_leader(self):
         with self.become_leader_lock:
@@ -198,17 +198,19 @@ class Raft:
                                         .format(self.id['host'], self.id['port']))
                 # Update variables
                 self.state = State.LEADER
-                threading.Thread(target=self.add_entries).start()
                 # Update next index and match index
                 self.nextIndex[self._get_id_tuple(self.id)] =\
-                                                    self._last_log_index() + 1
+                                                    self.commitIndex + 1
+                print(self.nextIndex[self._get_id_tuple(self.id)])
                 self.matchIndex[self._get_id_tuple(self.id)] = self.commitIndex
                 for peer in self.rocket.get_peers():
                     self.nextIndex[self._get_id_tuple(peer)] =\
-                                                    self._last_log_index() + 1
+                                                    self.commitIndex + 1
                     self.matchIndex[self._get_id_tuple(peer)] = 0
                     # Start heartbeat
                     self.append_entries_timer[self._get_id_tuple(peer)].start()
+                # start append entries
+                threading.Thread(target=self.add_entries).start()
 
     def _grant_vote(self, term, candidateID):
         """
@@ -255,7 +257,7 @@ class Raft:
         return answer
 
     def _check_leader_command(self, request_json):
-        #print("Server received command from leader : {}\n".format(request_json))
+        print("Server received command from leader : {}\n".format(request_json))
         if request_json['term'] > self.currentTerm:
             self._become_follower(request_json['term'])
         if request_json['term'] < self.currentTerm:
@@ -281,6 +283,9 @@ class Raft:
                 if rocket_flag:
                     # Reset only if rocket is ok with the current command
                     self.reset_election_timer()
+            else:
+                # Let the leader try to synchronize
+                self.reset_election_timer()
             return AppendEntriesAnswer(self.currentTerm,
                                        success_raft,
                                        index,
@@ -341,13 +346,15 @@ class Raft:
         # Acquire lock
         with self.add_entries_lock:
             # Check which command (State or Action) to send
-            while self.timestep < len(actions) and self.state is State.LEADER:
+            while self.state is State.LEADER and self.timestep < len(actions):
                 last_entry = self._get_last_log()
                 command = {}
                 if last_entry is None or 'action' in last_entry.command:
                     command['state'] = states[self.timestep]
                 else:
                     command['action'] = self.rocket.sample_next_action()
+                    if command['action'] is None:
+                        return
                     #print("trying to deliver the action\n:{}".format(command))
                 entry = Log(self.currentTerm, command)
                 self.log.append(entry)
@@ -419,8 +426,8 @@ class Raft:
         elif self.state == State.LEADER and reply_json['term'] == self.currentTerm:
             if reply_json['success']:
                 if reply_json['rocket_flag']:
-                    # It means that the leader knows that the follower accepted the last entry
                     if self.nextIndex[self._get_id_tuple(peer)] < reply_json['index'] + 2:
+                        # It means that the leader knows that the follower accepted the last entry
                         # It is here the difference with Raft
                         # We suppose that rocket_flag means that the leader can
                         # compute reply_json['index'] + 1 for match index
@@ -430,10 +437,11 @@ class Raft:
                                                         reply_json['index'] + 1
                         self._update_commit(reply_json['index'] + 1)
             else:
+                # Set the follower in the same state of the leader
                 self.nextIndex[self._get_id_tuple(peer)] =\
-                    max(1, self.nextIndex[self._get_id_tuple(peer)] - 1)
+                    max(1, reply_json['index'] + 1) # TODO: Maybe + 1 ?
                 self.matchIndex[self._get_id_tuple(peer)] =\
-                    max(0, self.matchIndex[self._get_id_tuple(peer)] - 1)
+                    max(0, reply_json['index'])
 
 
     def _update_commit(self, index):
