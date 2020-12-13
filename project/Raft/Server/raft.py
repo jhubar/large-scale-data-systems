@@ -341,7 +341,7 @@ class Raft:
         # Acquire lock
         with self.add_entries_lock:
             # Check which command (State or Action) to send
-            while self.timestep < len(actions) or self.state is State.LEADER:
+            while self.timestep < len(actions) and self.state is State.LEADER:
                 last_entry = self._get_last_log()
                 command = {}
                 if last_entry is None or 'action' in last_entry.command:
@@ -406,10 +406,7 @@ class Raft:
                 if reply is not None and self.state is State.LEADER:
                     self._append_entries_answer(reply.json(), peer)
                 # Reset the append entry timer (the heartbeat)
-                try:
-                    self.append_entries_timer[self._get_id_tuple(peer)].reset()
-                except Exception as e:
-                    return
+                self.append_entries_timer[self._get_id_tuple(peer)].reset()
 
 
     def _append_entries_answer(self, reply_json, peer):
