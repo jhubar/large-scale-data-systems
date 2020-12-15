@@ -32,8 +32,7 @@ class AppendEntriesAnswer():
     term: currentTerm, for leader to update itself
     success: true if follower contained entry matching prevLogIndex and prevLogTerm
     """
-    def __init__(self, term, success, index, rocket_flag):
+    def __init__(self, term, success, index):
         self.term = term
         self.success = success
         self.index = index
-        self.rocket_flag = rocket_flag

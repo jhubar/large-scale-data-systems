@@ -32,17 +32,17 @@ def append_entries():
     request_json = request.json
     return jsonify(raft.receive_leader_command(request_json))
 
-# @app.route('/command', methods=['POST'])
-# def get_command():
-#     if raft.state is State.FOLLOWER:
-#         leader_id = raft.votedFor
-#         return redirect("http://{}:{}/command".format(leader_id['host'],\
-#                                                       leader_id['port']),\
-#                         code=307)
-#     elif raft.state is State.CANDIDATE:
-#         return jsonify(False)
-#     else:
-#         return jsonify(raft.add_entries())
+@app.route('/command', methods=['POST'])
+def get_command():
+    if raft.state is State.FOLLOWER:
+        leader_id = raft.votedFor
+        return redirect("http://{}:{}/command".format(leader_id['host'],\
+                                                      leader_id['port']),\
+                        code=307)
+    elif raft.state is State.CANDIDATE:
+        return jsonify(False)
+    else:
+        return jsonify(raft.add_entries())
 
 
 def parse_arguments():
