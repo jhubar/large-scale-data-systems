@@ -22,7 +22,7 @@ actions = pickle.load(open("data/actions.pickle", "rb"))
 states = pickle.load(open("data/states.pickle", "rb"))
 
 class Raft:
-    def __init__(self, rocket, id, peers=[]):
+    def __init__(self, fc, id, peers=[]):
         self.timestep = 0
         # Common to all raft server
         self.state = State.FOLLOWER
@@ -32,7 +32,7 @@ class Raft:
         self.commitIndex = 0
         self.lastApplied = 0
         # Flight Computer object
-        self.rocket = rocket(states[self.timestep])
+        self.fc = fc(states[self.timestep])
         # Flask information
         self.id = id
         # Raft information
@@ -40,7 +40,7 @@ class Raft:
         self.vote = 0
         self.majority = math.ceil((len(peers) + 1) / 2)
         for peer in peers:
-            self.rocket.add_peer(peer)
+            self.fc.add_peer(peer)
         # Various variable (Locks, etc)
         self.append_entries_lock = self._init_append_entries_lock(peers)
         self.leader_command_lock = threading.Lock()
@@ -52,7 +52,6 @@ class Raft:
         self.append_entries_timer = self._init_append_entries_timer(peers)
         # Boolean that allows to know if rocket ends
         self.is_done = False
-        time.sleep(3)
 
     def _init_next_index(self, peers):
         nextIndex = {}
@@ -104,7 +103,7 @@ class Raft:
             # Start the timer election
             self.election_timer.reset()
             # get the peers and send a VoteRequest
-            peers = self.rocket.get_peers()
+            peers = self.fc.get_peers()
             for peer in peers:
                 threading.Thread(target=self.run_election,
                                  args=(self.currentTerm,
@@ -186,7 +185,7 @@ class Raft:
             self.nextIndex[self._get_id_tuple(self.id)] =\
                                                 self._last_log_index() + 1
             self.matchIndex[self._get_id_tuple(self.id)] = self._last_log_index()
-            for peer in self.rocket.get_peers():
+            for peer in self.fc.get_peers():
                 self.nextIndex[self._get_id_tuple(peer)] =\
                                                 self._last_log_index() + 1
                 self.matchIndex[self._get_id_tuple(peer)] = 0
@@ -255,6 +254,7 @@ class Raft:
     def _store_and_execute(self, prevLogIndex, entries, commitIndex):
         # Initialise
         index = prevLogIndex
+        # TODO: Eviter de faire cette ligne
         self.log = self.log[0:index]
         for json_log in entries:
             log_received = Log(json_log['term'], json_log['command'])

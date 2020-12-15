@@ -82,7 +82,6 @@ if __name__ == '__main__':
         fc = FlightComputer
     else:
         fc = allocate_random_flight_computer()
-    print(fc)
     raft = Raft(fc, raft_id, peers)
     raft.start_raft()
     # Run Flask app
