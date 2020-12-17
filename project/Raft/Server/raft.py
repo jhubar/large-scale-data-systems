@@ -5,80 +5,54 @@ from collections import Counter
 from ..State_Machine.log import Log
 from ..Abstraction.timer import RaftRandomTime, RaftTimer
 from ..RPC.request_vote import VoteAnswer, VoteRequest
-from ..RPC.append_entries import *
+from ..RPC.heartbeat import Heartbeat, HeartbeatAnswer
+from ..RPC.action_answer import ActionAnswer
 from ..Abstraction.send import *
 import json
 import math
 import threading
 import logging
 import time
-import pickle
 import os, signal
 import sys
 from enum import Enum
 
-# Load the pickle files
-actions = pickle.load(open("data/actions.pickle", "rb"))
-states = pickle.load(open("data/states.pickle", "rb"))
-
 class Raft:
     def __init__(self, fc, id, peers=[]):
-        self.timestep = 0
         # Common to all raft server
         self.state = State.FOLLOWER
-        self.currentTerm = 0
         self.votedFor = None
-        self.log = []
-        self.commitIndex = 0
-        self.lastApplied = 0
+        self.index = 0
+        self.currentTerm = 0
         # Flight Computer object
-        self.fc = fc(states[self.timestep])
-        # Flask information
+        self.fc = fc
         self.id = id
         # Raft information
-        self.election_timer = RaftRandomTime(4, 8, self.time_out, args=())
+        self.election_timer = RaftRandomTime(0.600, 0.900, self.time_out, args=())
         self.vote = 0
         self.majority = math.ceil((len(peers) + 1) / 2)
         for peer in peers:
             self.fc.add_peer(peer)
         # Various variable (Locks, etc)
-        self.append_entries_lock = self._init_append_entries_lock(peers)
-        self.leader_command_lock = threading.Lock()
-        self.update_commit_lock = threading.Lock()
+        self.rpc_lock = self._init_rpc_lock(peers)
         self.increment_vote_lock = threading.Lock()
         # Only Leader handles these variables
-        self.nextIndex = self._init_next_index(peers)
-        self.matchIndex = self._init_match_index(peers)
-        self.append_entries_timer = self._init_append_entries_timer(peers)
-        # Boolean that allows to know if rocket ends
-        self.is_done = False
+        self.heartbeat_timer = self._init_heartbeat_timer(peers)
+        self.state_answer = {}
+        self.action_answer = {}
 
-    def _init_next_index(self, peers):
-        nextIndex = {}
-        nextIndex[self._get_id_tuple(self.id)] = 1
+    def _init_heartbeat_timer(self, peers):
+        heartbeat_timer = {}
         for peer in peers:
-            nextIndex[self._get_id_tuple(peer)] = 1
-        return nextIndex
+            heartbeat_timer[self._get_id_tuple(peer)] = \
+                RaftTimer(0.300, self._heartbeat, args=(peer,))
+        return heartbeat_timer
 
-    def _init_match_index(self, peers):
-        matchIndex = {}
-        matchIndex[self._get_id_tuple(self.id)] = 0
+    def _init_rpc_lock(self, peers):
+        rpc_lock = {}
         for peer in peers:
-            matchIndex[self._get_id_tuple(peer)] = 0
-        return matchIndex
-
-    def _init_append_entries_timer(self, peers):
-        append_entries_timer = {}
-        for peer in peers:
-            append_entries_timer[self._get_id_tuple(peer)] = \
-                RaftTimer(2.0, self._send_append_entries, args=(peer,))
-        return append_entries_timer
-
-    def _init_append_entries_lock(self, peers):
-        append_entries_lock = {}
-        for peer in peers:
-            append_entries_lock[self._get_id_tuple(peer)] = threading.Lock()
-        return append_entries_lock
+            rpc_lock[self._get_id_tuple(peer)] = threading.Lock()
+        return rpc_lock
 
     def start_raft(self):
         self.election_timer.start()
@@ -93,30 +67,26 @@ class Raft:
             # Start an election
             print("The raft server http://{}:{}/ has an election timeout".format(self.id['host'], self.id['port']))
             self.vote = 0
+            self.currentTerm += 1
             # Goes to CANDIDATE state
             self.state = State.CANDIDATE
-            # Increment current term
-            self.currentTerm = self.currentTerm + 1
             # Vote for itself
             self.votedFor = self.id
             self.vote = self.vote + 1
             # Start the timer election
             self.election_timer.reset()
             # get the peers and send a VoteRequest
-            peers = self.fc.get_peers()
-            for peer in peers:
+            for peer in self.fc.get_peers():
                 threading.Thread(target=self.run_election,
                                  args=(self.currentTerm,
-                                        self._last_log_index(),
-                                        self._last_log_term(),
-                                        peer)).start()
+                                       self.index,
+                                       peer)).start()
 
-    def run_election(self, currentTerm, lastLogIndex, lastLogTerm, peer):
-        message = VoteRequest(currentTerm, self.id, lastLogIndex, lastLogTerm).__dict__
+    def run_election(self, term, index, peer):
+        message = VoteRequest(term, self.id, index).get_message()
         # Post method
         url = "vote_request"
-        # Need to loop while state is CANDIDATE and currentTerm == self.currentTerm
-        while self.state is State.CANDIDATE and currentTerm is self.currentTerm:
+        while self.state is State.CANDIDATE and term is self.currentTerm:
             reply = send_post(peer, url, message)
             if reply is not None and self.state is State.CANDIDATE:
                 if reply.json()['voteGranted']:
@@ -145,9 +115,8 @@ class Raft:
             self._become_follower(request_json['term'])
 
         if request_json['term'] == self.currentTerm and \
-        self._check_consistent_vote(request_json['candidateID']) and \
-        self._check_election_log_safety(request_json['lastLogTerm'], \
-                                       request_json['lastLogIndex']):
+        self._check_consistent_vote(request_json['candidateID']) and\
+        self.index <= request_json['index']:
             # The raft server grant this candidate
             print("Raft server http://{}:{} voted for the raft server http://{}:{}"\
             .format(self.id['host'],
@@ -157,10 +126,10 @@ class Raft:
             self.currentTerm = request_json['term']
             self.votedFor = request_json['candidateID']
             self.election_timer.reset()
-            answer = VoteAnswer(True, self.currentTerm).__dict__
+            answer = VoteAnswer(True, self.currentTerm).get_message()
         else:
             # The FOLLOWER raft server cannot grant this candidate
-            answer = VoteAnswer(False, self.currentTerm).__dict__
+            answer = VoteAnswer(False, self.currentTerm).get_message()
 
         return answer
 
@@ -181,18 +150,10 @@ class Raft:
                                     .format(self.id['host'], self.id['port']))
             # Update variables
             self.state = State.LEADER
-            # Update next index and match index
-            self.nextIndex[self._get_id_tuple(self.id)] =\
-                                                self._last_log_index() + 1
-            self.matchIndex[self._get_id_tuple(self.id)] = self._last_log_index()
             for peer in self.fc.get_peers():
-                self.nextIndex[self._get_id_tuple(peer)] =\
-                                                self._last_log_index() + 1
-                self.matchIndex[self._get_id_tuple(peer)] = 0
                 # Start heartbeat
-                self.append_entries_timer[self._get_id_tuple(peer)].start_with_time(0)
-            # start append entries
-            threading.Thread(target=self.add_entries).start()
+                self.heartbeat_timer[self._get_id_tuple(peer)]\
+                                         .start_with_time(0)
 
 
     def _check_consistent_vote(self, candidateID):
@@ -202,140 +163,204 @@ class Raft:
         # The raft server cannot vote for this candidate
         return False
 
-    def _check_election_log_safety(self, lastLogTerm, lastLogIndex):
-        """
-        Check if a the last log of the raft server is as up-to-date than the last
-        log of the candidate.
-        return True if last log is up-to-date with the candidate
-               False otherwise
-        """
-        if lastLogTerm > self._last_log_term() or\
-           (lastLogTerm >= self._last_log_term() and\
-           lastLogIndex >= self._last_log_index()):
-           return True
-        else:
-           return False
 
     """
-    AppendEntries Handler
+    Heartbeat Handler
+    """
+    def _heartbeat(self, peer):
+        url = 'heartbeat'
+        message = Heartbeat(self.currentTerm, self.index, self.id).get_message()
+        with self.rpc_lock[self._get_id_tuple(peer)]:
+            reply = send_post(peer, url, message)
+            if reply is not None and self.state is State.LEADER:
+                # Check if the leader is considered as a leader
+                if reply.json()['term'] > self.currentTerm:
+                    self._become_follower(reply.json()['term'])
+                    return
+            # If everything is fine, reset the timer
+            self.heartbeat_timer[self._get_id_tuple(peer)].reset()
+
+    def process_heartbeat(self, heartbeat_request):
+        #print('heartbeat received: {}'.format(heartbeat_request))
+        # Update The term if needed
+        if heartbeat_request['term'] > self.currentTerm:
+            self._become_follower(heartbeat_request['term'])
+
+        if heartbeat_request['term'] < self.currentTerm:
+            # Oups, i don't trust him
+            return HeartbeatAnswer(self.currentTerm,
+                                   self.index,
+                                   self.id,
+                                   False).get_message()
+        # Yes he is my antoine Oh god!!.
+        self.election_timer.reset()
+        return HeartbeatAnswer(self.currentTerm,
+                               self.index,
+                               self.id,
+                               True).get_message()
+
+    """
+    Replicate state Handler
     """
 
-    def receive_leader_command(self, request_json):
-        with self.leader_command_lock:
-            return self._check_leader_command(request_json)
+    def process_decide_on_state(self, request_json):
+        # Ask to everyone if state is ok !
+        if self.state is State.LEADER:
+            print("Need to send state {}".format(request_json['state']))
+            self.state_answer.clear()
+            for peer in self.fc.get_peers():
+                threading.Thread(target=self._process_replicate_state,
+                                 args=(peer, request_json)).start()
+            # Wait all responses
+            self.state_answer[self._get_id_tuple(self.id)] = True
+            while len(self.state_answer) != (len(self.fc.get_peers()) + 1):
+                continue
 
-    def _check_leader_command(self, request_json):
-        print("Server received command from leader : {}\n".format(request_json))
-        if request_json['term'] > self.currentTerm:
-            self._become_follower(request_json['term'])
-        if request_json['term'] < self.currentTerm:
-            return AppendEntriesAnswer(self.currentTerm,
-                                       False,
-                                       -1,
-                                       False).__dict__
-        else:
-            # Check raft completeness
-            index = 0
-            prevLogIndex = request_json['prevLogIndex']
-            prevLogTerm = request_json['prevLogTerm']
-            success_raft = prevLogIndex == 0 or \
-             (prevLogIndex <= self._last_log_index() and \
-             self._get_term_by_index(prevLogIndex) == prevLogTerm)
-            if success_raft:
-                # Check the command
-                self.election_timer.reset()
-                index =self._store_and_execute(prevLogIndex,
-                                               request_json['entries'],
-                                               request_json['commitIndex'])
-            return AppendEntriesAnswer(self.currentTerm,
-                                       success_raft,
-                                       index).__dict__
+            decided = sum(self.state_answer.values()) >= self.majority
 
-    def _store_and_execute(self, prevLogIndex, entries, commitIndex):
-        # Initialise
-        index = prevLogIndex
-        # TODO: Eviter de faire cette ligne
-        self.log = self.log[0:index]
-        for json_log in entries:
-            log_received = Log(json_log['term'], json_log['command'])
-            self.log.insert(index, log_received)
-            index = index + 1
-
-        if commitIndex > self.commitIndex:
-            self.commitIndex = min(commitIndex, index)
-        return index
-
-    def add_entries(self):
-        self.log.append(Log(self.currentTerm, {'lol': 5}))
-
-    def _send_append_entries(self, peer):
-        with self.append_entries_lock[self._get_id_tuple(peer)]:
-            url = 'append_entries'
-            if self.state == State.LEADER:
-                # Cancel append entries timer by default (the heartbeat)
-                #self.append_entries_timer[self._get_id_tuple(peer)].cancel()
-                prevLogIndex = self.nextIndex[self._get_id_tuple(peer)]
-                message = AppendEntriesRequest(self.currentTerm,
-                                               self.id,
-                                               prevLogIndex - 1,
-                                               self._get_term_by_index(prevLogIndex - 1),
-                                               self.log[(prevLogIndex - 1):len(self.log)],
-                                               self.commitIndex).get_message()
-                reply = send_post(peer, url, message)
-                if reply is not None and self.state is State.LEADER:
-                    self._append_entries_answer(reply.json(), peer)
-                # Reset the append entry timer (the heartbeat)
-                self.append_entries_timer[self._get_id_tuple(peer)].reset()
-
-
-    def _append_entries_answer(self, reply_json, peer):
-        """
-        when leader receives follower answer
-        """
-        print("Leader received reply {}\n".format(reply_json))
-        if reply_json['term'] > self.currentTerm:
-            self._become_follower(reply_json['term'])
-        elif self.state == State.LEADER and reply_json['term'] == self.currentTerm:
-            if reply_json['success']:
-                if self.nextIndex[self._get_id_tuple(peer)] < reply_json['index'] + 1:
-                    self.nextIndex[self._get_id_tuple(peer)] =\
-                                                    reply_json['index'] + 1
-                    self.matchIndex[self._get_id_tuple(peer)] =\
-                                                    reply_json['index'] + 1
-                    self._update_commit(reply_json['index'] + 1)
+            if decided:
+                 # Deliver state
+                 self.state_answer.clear()
+                 for peer in self.fc.get_peers():
+                     threading.Thread(target=self._deliver_state,
+                                      args=(peer, request_json)).start()
+                 # Wait responses
+                 self.fc.deliver_state(request_json['state'])
+                 self.index += 1
+                 self.state_answer[self._get_id_tuple(self.id)] = True
+                 while len(self.state_answer) != (len(self.fc.get_peers()) + 1):
+                     continue
             else:
-                # Set the follower in the same state of the leader
-                self.nextIndex[self._get_id_tuple(peer)] =\
-                    max(1, reply_json['index'] + 1)
-                self.matchIndex[self._get_id_tuple(peer)] =\
-                    max(0, reply_json['index'])
+                # Leader boude
+                self._become_follower(self.currentTerm)
+                # Leader grumble because he is not reliable
+                self.election_timer.reset_grumble()
+            return decided
+
+    def _process_replicate_state(self, peer, state):
+        with self.rpc_lock[self._get_id_tuple(peer)]:
+            url = 'acceptable_state'
+            message = state
+            reply = send_post(peer, url, message)
+            if reply is None:
+                self.heartbeat_timer[self._get_id_tuple(peer)].reset()
+                self.state_answer[self._get_id_tuple(peer)] = False
+            else:
+                self.state_answer[self._get_id_tuple(peer)] = True
+
+    def _deliver_state(self, peer, state):
+        with self.rpc_lock[self._get_id_tuple(peer)]:
+            url = 'deliver_state'
+            message = state
+            reply = send_post(peer, url, message)
+            if reply is not None:
+                self.heartbeat_timer[self._get_id_tuple(peer)].reset()
+            self.state_answer[self._get_id_tuple(peer)] = True
+
+    def process_acceptable_state(self, request_state):
+        # Need to simulate heartbeat
+        self.election_timer.reset()
+        return self.fc.acceptable_state(request_state)
+
+    def process_deliver_state(self, state_request):
+        # Need to simulate heartbeat
+        self.election_timer.reset()
+        self.fc.deliver_state(state_request['state'])
+        self.index += 1
+        return True
 
 
-    def _update_commit(self, index):
-        if index > self.commitIndex:
-            with self.update_commit_lock:
-                count = len([value for value in self.matchIndex.values()\
-                                             if value >= index])
-                if count >= self.majority and \
-                        self._get_term_by_index(index) == self.currentTerm:
-                    self.commitIndex = index
+    """
+    Replicate Action handler
+    """
+    def process_decide_on_action(self, request_json):
+        # Ask to everyone if Action is ok !
+        if self.state is State.LEADER:
+            print("Need to send Action {}".format(request_json['action']))
+            self.action_answer.clear()
+            for peer in self.fc.get_peers():
+                threading.Thread(target=self._process_replicate_action,
+                                 args=(peer, request_json)).start()
+            # Wait all responses
+            self.action_answer[self._get_id_tuple(self.id)] = True
+            while len(self.action_answer) != (len(self.fc.get_peers()) + 1):
+                continue
+
+            decided = sum(self.action_answer.values()) >= self.majority
+
+            if decided:
+                # Deliver state
+                self.action_answer.clear()
+                for peer in self.fc.get_peers():
+                    threading.Thread(target=self._deliver_action,
+                                  args=(peer, request_json)).start()
+                # Wait responses
+                self.fc.deliver_action(request_json['action'])
+                self.index += 1
+                self.action_answer[self._get_id_tuple(self.id)] = True
+                while len(self.action_answer) != (len(self.fc.get_peers()) + 1):
+                    continue
+            else:
+                self._become_follower(self.currentTerm)
+                # Leader grumble because he is not reliable
+                self.election_timer.reset_grumble()
+            return decided
+
+    def _process_replicate_action(self, peer, action):
+        with self.rpc_lock[self._get_id_tuple(peer)]:
+            url = 'acceptable_action'
+            message = action
+            reply = send_post(peer, url, message)
+            if reply is None:
+                self.action_answer[self._get_id_tuple(peer)] = False
+                return
+            self.heartbeat_timer[self._get_id_tuple(peer)].reset()
+            if not reply.json()['answer']:
+                self.action_answer[self._get_id_tuple(peer)] = False
+            else:
+                self.action_answer[self._get_id_tuple(peer)] = True
+
+    def _deliver_action(self, peer, action):
+        with self.rpc_lock[self._get_id_tuple(peer)]:
+            url = 'deliver_action'
+            message = action
+            reply = send_post(peer, url, message)
+            if reply is not None:
+                self.heartbeat_timer[self._get_id_tuple(peer)].reset()
+                self.action_answer[self._get_id_tuple(peer)] = True
+            else:
+                self.action_answer[self._get_id_tuple(peer)] = False
+
+    def process_acceptable_action(self, request_action):
+        # TODO: Handle slow here with lock
+        try:
+            self.election_timer.reset()
+            return ActionAnswer(self.fc.acceptable_action(request_action['action'])).get_message()
+        except Exception as e:
+            print(e)
+            os._exit(-1)
+
+    def process_deliver_action(self, action_request):
+        # Need to simulate heartbeat
+        self.election_timer.reset()
+        self.fc.deliver_action(action_request['action'])
+        self.index += 1
+        return True
+
+    """
+    When leader ask for sample_next_action
+    """
+    def process_sample_next_action(self):
+        if self.state is State.LEADER:
+            try:
+                return self.fc.sample_next_action()
+            except Exception as e:
+                print(e)
+                os._exit(-1)
 
     """
     Various function
     """
-    def _last_log_index(self):
-        return len(self.log)
-
-    def _last_log_term(self):
-        return self.log[-1].term if self.log else 0
-
-    def _get_term_by_index(self, index):
-        if index == 0:
-            return 0
-        return self.log[index - 1].term
-
-    def _get_last_log(self):
-        return self.log[-1] if self.log else None
 
     def _get_id_tuple(self, peer):
         return (peer['host'], peer['port'])

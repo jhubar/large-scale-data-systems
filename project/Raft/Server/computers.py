@@ -3,7 +3,6 @@ import time
 
 
 
-
 class FlightComputer:
 
     def __init__(self, state):
@@ -23,11 +22,11 @@ class FlightComputer:
             self._handle_stage_9]
         self.stage_handler = self.stage_handlers[self.current_stage_index]
 
-    def get_peers(self):
-        return self.peers
-
     def add_peer(self, peer):
         self.peers.append(peer)
+
+    def get_peers(self):
+        return self.peers
 
     def _handle_stage_1(self):
         action = {"pitch": 90, "throttle": 1.0, "heading": 90, "stage": False, "next_state": False}
@@ -107,6 +106,28 @@ class FlightComputer:
     def sample_next_action(self):
         return self.stage_handler()
 
+    # def decide_on_state(self, state):
+    #     acceptations = [p.acceptable_state(state) for p in self.peers]
+    #     decided = sum(acceptations) / (len(self.peers) + 1) > 0.5
+    #
+    #     if decided:
+    #         for p in self.peers:
+    #             p.deliver_state(state)
+    #         self.deliver_state(state)
+    #
+    #     return decided
+    #
+    # def decide_on_action(self, action):
+    #     acceptations = [p.acceptable_action(action) for p in self.peers]
+    #     decided = sum(acceptations) / (len(self.peers) + 1) > 0.5
+    #
+    #     if decided:
+    #         for p in self.peers:
+    #             p.deliver_action(action)
+    #         self.deliver_action(action)
+    #
+    #     return decided
+
     def acceptable_state(self, state):
         return True
 
@@ -123,7 +144,6 @@ class FlightComputer:
         if "next_stage" in action and action["next_stage"]:
             self.current_stage_index += 1
             self.stage_handler = self.stage_handlers[self.current_stage_index]
-            print("Entering stage number {}".format(self.current_stage_index))
 
     def deliver_state(self, state):
         self.state = state
@@ -179,7 +199,9 @@ class CrashingFlightComputer(FlightComputer):
 
         return action
 
-def allocate_random_flight_computer():
+
+
+def allocate_random_flight_computer(state):
     computers = [
         FullThrottleFlightComputer,
         RandomThrottleFlightComputer,
@@ -187,4 +209,4 @@ def allocate_random_flight_computer():
         CrashingFlightComputer,
     ]
 
-    return computers[np.random.randint(0, len(computers))]
+    return computers[np.random.randint(0, len(computers))](state)

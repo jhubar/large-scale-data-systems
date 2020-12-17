@@ -1,20 +1,21 @@
+from .message import Message
 
-class VoteRequest:
+class VoteRequest(Message):
     """
     term : condidate's term
     candidateID: candidate requesting vote
     lastLogIndex: index of candidate's last log entry
     lastLogTerm: term of candidate's last log entry
     """
-    def __init__(self, term, candidateID, lastLogIndex, lastLogTerm):
-        self.term = term
+    def __init__(self, term, candidateID, index):
+        super(VoteRequest, self).__init__()
         self.candidateID = candidateID
-        self.lastLogIndex = lastLogIndex
-        self.lastLogTerm = lastLogTerm
+        self.index = index
+        self.term = term
 
 
 
-class VoteAnswer:
+class VoteAnswer(Message):
     """
     voteGranted: The response for the candidate
     term : condidate's term
@@ -23,5 +24,6 @@ class VoteAnswer:
     lastLogTerm: term of candidate's last log entry
     """
     def __init__(self, voteGranted, term):
+        super(VoteAnswer, self).__init__()
         self.voteGranted = voteGranted
         self.term = term

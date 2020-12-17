@@ -8,7 +8,7 @@ from enum import Enum
     to have failed.
 """
 
-def send_get(peer, endpoint, params, TIMEOUT=0.075):
+def send_get(peer, endpoint, params, TIMEOUT=0.05):
     url = get_url(peer, endpoint)
     try:
         reply = requests.get(url, params=params, timeout=TIMEOUT)
@@ -18,7 +18,7 @@ def send_get(peer, endpoint, params, TIMEOUT=0.075):
 
     return reply_handler(reply)
 
-def send_post(peer, endpoint, json, TIMEOUT=0.075):
+def send_post(peer, endpoint, json, TIMEOUT=0.05):
     url = get_url(peer, endpoint)
     try:
         reply = requests.post(url, json=json)
