@@ -13,7 +13,7 @@ import math
 import threading
 import logging
 import time
-import os, signal
+import os
 import sys
 from enum import Enum
 
@@ -28,9 +28,10 @@ class Raft:
         self.fc = fc
         self.id = id
         # Raft information
-        self.election_timer = RaftRandomTime(0.600, 0.900, self.time_out, args=())
+        self.election_timer = RaftRandomTime(0.150, 0.300, self.time_out, args=())
         self.vote = 0
-        self.majority = math.ceil((len(peers) + 1) / 2)
+        self.majority = math.floor((len(peers) + 1) / 2) + 1
+        print(self.majority)
         for peer in peers:
             self.fc.add_peer(peer)
         # Various variable (Locks, etc)
@@ -45,7 +46,7 @@ class Raft:
         heartbeat_timer = {}
         for peer in peers:
             heartbeat_timer[self._get_id_tuple(peer)] = \
-                RaftTimer(0.300, self._heartbeat, args=(peer,))
+                RaftTimer(0.075, self._heartbeat, args=(peer,))
         return heartbeat_timer
 
     def _init_rpc_lock(self, peers):
@@ -185,6 +186,7 @@ class Raft:
         # Update The term if needed
         if heartbeat_request['term'] > self.currentTerm:
             self._become_follower(heartbeat_request['term'])
+            self.votedFor = heartbeat_request['id']
 
         if heartbeat_request['term'] < self.currentTerm:
             # Oups, i don't trust him

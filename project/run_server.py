@@ -41,7 +41,7 @@ def decide_on_state():
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
-            return False
+            return jsonify(False)
         return redirect("http://{}:{}/decide_on_state"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
@@ -64,7 +64,7 @@ def decide_on_action():
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
-            return False
+            return jsonify(False)
         return redirect("http://{}:{}/decide_on_action"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
@@ -83,7 +83,7 @@ def sample_next_action():
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
-            return False
+            return jsonify(False)
         return redirect("http://{}:{}/sample_next_action"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
