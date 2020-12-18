@@ -310,6 +310,7 @@ class Raft:
             return ActionAnswer(self.fc.acceptable_action(request_action['action'])).get_message()
         except Exception as e:
             print(e)
+            print("IT'S A TRAP")
             os._exit(-1)
 
     def process_deliver_action(self, action_request):
@@ -328,6 +329,7 @@ class Raft:
                 return self.fc.sample_next_action()
             except Exception as e:
                 print(e)
+                print("IT'S A TRAP")
                 os._exit(-1)
 
     """
