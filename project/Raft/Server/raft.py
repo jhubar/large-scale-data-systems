@@ -2,7 +2,6 @@
 
 from .state import State
 from collections import Counter
-from ..State_Machine.log import Log
 from ..Abstraction.timer import RaftRandomTime, RaftTimer
 from ..RPC.request_vote import VoteAnswer, VoteRequest
 from ..RPC.heartbeat import Heartbeat, HeartbeatAnswer
