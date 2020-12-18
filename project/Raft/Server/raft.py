@@ -6,7 +6,7 @@ from ..State_Machine.log import Log
 from ..Abstraction.timer import RaftRandomTime, RaftTimer
 from ..RPC.request_vote import VoteAnswer, VoteRequest
 from ..RPC.heartbeat import Heartbeat, HeartbeatAnswer
-from ..RPC.command_answer import ActionAnswer
+from ..RPC.action_answer import ActionAnswer
 from ..Abstraction.send import *
 import json
 import math
@@ -39,7 +39,6 @@ class Raft:
         self.increment_vote_lock = threading.Lock()
         # Only Leader handles these variables
         self.heartbeat_timer = self._init_heartbeat_timer(peers)
-        self.command_answer = {}
         self.command_answer = {}
 
     def _init_heartbeat_timer(self, peers):
@@ -209,9 +208,13 @@ class Raft:
             if 'action' in request_json:
                 acceptable_function = self._process_replicate_action
                 deliver_function = self._deliver_action
+                fc_deliver_function = self.fc.deliver_action
+                key = 'action'
             elif 'state' in request_json:
                 acceptable_function = self._process_replicate_state
                 deliver_function = self._deliver_state
+                fc_deliver_function = self.fc.deliver_state
+                key = 'state'
             else:
                 return (False, "Bad command")
             self.command_answer.clear()
@@ -232,7 +235,7 @@ class Raft:
                      threading.Thread(target=deliver_function,
                                       args=(peer, request_json)).start()
                  # Wait responses
-                 self.fc.deliver_state(request_json['state'])
+                 fc_deliver_function(request_json[key])
                  self.index += 1
                  self.command_answer[self._get_id_tuple(self.id)] = True
                  while len(self.command_answer) != (len(self.fc.get_peers()) + 1):

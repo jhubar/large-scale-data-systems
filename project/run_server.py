@@ -38,18 +38,22 @@ def get_heartbeat():
 
 @app.route('/decide_on_state', methods=['POST'])
 def decide_on_state():
+    response = {}
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
-            return jsonify(False)
+            return error_no_leader()
         return redirect("http://{}:{}/decide_on_state"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
                          code=307)
     elif raft.state is State.CANDIDATE:
-        return jsonify(False)
+        return error_no_leader()
     else:
-        return jsonify(raft.process_decide_on_command(request.json))
+        response = {}
+        response['leader'] = raft.id
+        response['status'] = raft.process_decide_on_command(request.json)
+        return jsonify(response)
 
 @app.route('/acceptable_state', methods=['POST'])
 def acceptable_state():
@@ -64,15 +68,18 @@ def decide_on_action():
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
-            return jsonify(False)
+            return error_no_leader()
         return redirect("http://{}:{}/decide_on_action"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
                          code=307)
     elif raft.state is State.CANDIDATE:
-        return jsonify(False)
+        return error_no_leader()
     else:
-        return jsonify(raft.process_decide_on_command(request.json))
+        response = {}
+        response['leader'] = raft.id
+        response['status'] = raft.process_decide_on_command(request.json)
+        return jsonify(response)
 
 @app.route('/acceptable_action', methods=['POST'])
 def acceptable_action():
@@ -83,15 +90,24 @@ def sample_next_action():
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
-            return jsonify(False)
+            return error_no_leader()
         return redirect("http://{}:{}/sample_next_action"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
                          code=307)
     elif raft.state is State.CANDIDATE:
-        return jsonify(False)
+        return error_no_leader()
     else:
-        return jsonify(raft.process_sample_next_action())
+        response = {}
+        response['leader'] = raft.id
+        response['action'] = raft.process_sample_next_action()
+        return jsonify(response)
+
+
+def error_no_leader():
+    response['leader'] = None
+    response['status'] = False
+    return jsonify(response)
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
