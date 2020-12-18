@@ -41,7 +41,7 @@ def main():
             # Consensus failed on State
             continue
 
-        print("LEADER! Show me your action")
+        print("LEADER! May the force be with you")
         # Check the action that the leader will try to replicate
         action = send_post(id_leader, 'sample_next_action', {}, TIMEOUT=0.075)
         if action is None:
