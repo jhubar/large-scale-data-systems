@@ -49,7 +49,7 @@ def decide_on_state():
     elif raft.state is State.CANDIDATE:
         return jsonify(False)
     else:
-        return jsonify(raft.process_decide_on_state(request.json))
+        return jsonify(raft.process_decide_on(request.json,True))
 
 @app.route('/acceptable_state', methods=['POST'])
 def acceptable_state():
@@ -72,7 +72,7 @@ def decide_on_action():
     elif raft.state is State.CANDIDATE:
         return jsonify(False)
     else:
-        return jsonify(raft.process_decide_on_action(request.json))
+        return jsonify(raft.process_decide_on(request.json,False))
 
 @app.route('/acceptable_action', methods=['POST'])
 def acceptable_action():

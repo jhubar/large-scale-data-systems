@@ -182,7 +182,7 @@ class Raft:
             self.heartbeat_timer[self._get_id_tuple(peer)].reset()
 
     def process_heartbeat(self, heartbeat_request):
-        #print('heartbeat received: {}'.format(heartbeat_request))
+        print('heartbeat received: {}'.format(heartbeat_request))
         # Update The term if needed
         if heartbeat_request['term'] > self.currentTerm:
             self._become_follower(heartbeat_request['term'])
@@ -201,43 +201,63 @@ class Raft:
                                self.id,
                                True).get_message()
 
-    """
-    Replicate state Handler
-    """
 
-    def process_decide_on_state(self, request_json):
-        # Ask to everyone if state is ok !
+    def process_decide_on(self, request_json, choice = True):
+        # Ask to everyone if Action is ok !
         if self.state is State.LEADER:
-            #print("Need to send state {}".format(request_json['state']))
-            self.state_answer.clear()
-            for peer in self.fc.get_peers():
-                threading.Thread(target=self._process_replicate_state,
-                                 args=(peer, request_json)).start()
-            # Wait all responses
-            self.state_answer[self._get_id_tuple(self.id)] = True
-            while len(self.state_answer) != (len(self.fc.get_peers()) + 1):
-                continue
+            if choice:
+                self.state_answer.clear()
+                for peer in self.fc.get_peers():
+                    threading.Thread(target=self._process_replicate_state,
+                                     args=(peer, request_json)).start()
+                # Wait all responses
+                self.state_answer[self._get_id_tuple(self.id)] = True
+                while len(self.state_answer) != (len(self.fc.get_peers()) + 1):
+                    continue
 
-            decided = sum(self.state_answer.values()) >= self.majority
+                decided = sum(self.state_answer.values()) >= self.majority
+            else:
+                print("Need to send Action {}".format(request_json['action']))
+                self.action_answer.clear()
+                for peer in self.fc.get_peers():
+                    threading.Thread(target=self._process_replicate_action,
+                                     args=(peer, request_json)).start()
+                # Wait all responses
+                self.action_answer[self._get_id_tuple(self.id)] = True
+                while len(self.action_answer) != (len(self.fc.get_peers()) + 1):
+                    continue
+                decided = sum(self.action_answer.values()) >= self.majority
 
             if decided:
-                 # Deliver state
-                 self.state_answer.clear()
-                 for peer in self.fc.get_peers():
-                     threading.Thread(target=self._deliver_state,
+                if choice:
+                     # Deliver state
+                     self.state_answer.clear()
+                     for peer in self.fc.get_peers():
+                         threading.Thread(target=self._deliver_state,
+                                          args=(peer, request_json)).start()
+                     # Wait responses
+                     self.fc.deliver_state(request_json['state'])
+                     self.index += 1
+                     self.state_answer[self._get_id_tuple(self.id)] = True
+                     while len(self.state_answer) != (len(self.fc.get_peers()) + 1):
+                         continue
+                else:
+                    # Deliver state
+                    self.action_answer.clear()
+                    for peer in self.fc.get_peers():
+                        threading.Thread(target=self._deliver_action,
                                       args=(peer, request_json)).start()
-                 # Wait responses
-                 self.fc.deliver_state(request_json['state'])
-                 self.index += 1
-                 self.state_answer[self._get_id_tuple(self.id)] = True
-                 while len(self.state_answer) != (len(self.fc.get_peers()) + 1):
-                     continue
+                    # Wait responses
+                    self.fc.deliver_action(request_json['action'])
+                    self.index += 1
+                    self.action_answer[self._get_id_tuple(self.id)] = True
+                    while len(self.action_answer) != (len(self.fc.get_peers()) + 1):
+                        continue
             else:
-                # Leader boude
                 self._become_follower(self.currentTerm)
                 # Leader grumble because he is not reliable
                 self.election_timer.reset_grumble()
-            return decided
+        return decided
 
     def _process_replicate_state(self, peer, state):
         with self.rpc_lock[self._get_id_tuple(peer)]:
@@ -272,41 +292,6 @@ class Raft:
         return True
 
 
-    """
-    Replicate Action handler
-    """
-    def process_decide_on_action(self, request_json):
-        # Ask to everyone if Action is ok !
-        if self.state is State.LEADER:
-            #print("Need to send Action {}".format(request_json['action']))
-            self.action_answer.clear()
-            for peer in self.fc.get_peers():
-                threading.Thread(target=self._process_replicate_action,
-                                 args=(peer, request_json)).start()
-            # Wait all responses
-            self.action_answer[self._get_id_tuple(self.id)] = True
-            while len(self.action_answer) != (len(self.fc.get_peers()) + 1):
-                continue
-
-            decided = sum(self.action_answer.values()) >= self.majority
-
-            if decided:
-                # Deliver state
-                self.action_answer.clear()
-                for peer in self.fc.get_peers():
-                    threading.Thread(target=self._deliver_action,
-                                  args=(peer, request_json)).start()
-                # Wait responses
-                self.fc.deliver_action(request_json['action'])
-                self.index += 1
-                self.action_answer[self._get_id_tuple(self.id)] = True
-                while len(self.action_answer) != (len(self.fc.get_peers()) + 1):
-                    continue
-            else:
-                self._become_follower(self.currentTerm)
-                # Leader grumble because he is not reliable
-                self.election_timer.reset_grumble()
-            return decided
 
     def _process_replicate_action(self, peer, action):
         with self.rpc_lock[self._get_id_tuple(peer)]:
