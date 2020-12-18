@@ -19,12 +19,11 @@ def main():
     id_leader = None
     while not complete:
         timestep += 1
+        print("Trying to replicate at timestep = {}".format(timestep))
         state = readout_state(timestep)
         if id_leader is None:
             # Randomly select a server
             id_leader = select_leader(servers)
-        print()
-        print("Replicate this state")
         # Try replicate the action
         state_dict = {}
         state_dict['state'] = state
@@ -41,7 +40,6 @@ def main():
             # Consensus failed on State
             continue
 
-        print("LEADER! May the force be with you")
         # Check the action that the leader will try to replicate
         action = send_post(id_leader, 'sample_next_action', {}, TIMEOUT=0.075)
         if action is None:
@@ -58,8 +56,6 @@ def main():
             # No leader
             continue
 
-        print('LEADER! Replicate this action')
-        print()
         action_dict = {}
         action_dict['action'] = action.json()['action']
         # Ask to leader to replicate this action
