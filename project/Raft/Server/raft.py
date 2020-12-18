@@ -28,10 +28,9 @@ class Raft:
         self.fc = fc
         self.id = id
         # Raft information
-        self.election_timer = RaftRandomTime(0.150, 0.300, self.time_out, args=())
+        self.election_timer = RaftRandomTime(1.0, 2.0, self.time_out, args=())
         self.vote = 0
         self.majority = math.floor((len(peers) + 1) / 2) + 1
-        print(self.majority)
         for peer in peers:
             self.fc.add_peer(peer)
         # Various variable (Locks, etc)
@@ -45,7 +44,7 @@ class Raft:
         heartbeat_timer = {}
         for peer in peers:
             heartbeat_timer[self._get_id_tuple(peer)] = \
-                RaftTimer(0.075, self._heartbeat, args=(peer,))
+                RaftTimer(0.5, self._heartbeat, args=(peer,))
         return heartbeat_timer
 
     def _init_rpc_lock(self, peers):
@@ -181,7 +180,7 @@ class Raft:
             self.heartbeat_timer[self._get_id_tuple(peer)].reset()
 
     def process_heartbeat(self, heartbeat_request):
-        print('heartbeat received: {}'.format(heartbeat_request))
+        #print('heartbeat received: {}'.format(heartbeat_request))
         # Update The term if needed
         if heartbeat_request['term'] > self.currentTerm:
             self._become_follower(heartbeat_request['term'])
