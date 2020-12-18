@@ -60,7 +60,7 @@ while not complete:
     state_decided = send_post(id_leader, 'decide_on_state', state_dict, TIMEOUT=0.075)
 
     # Check if no answer from the server
-    if state_decider is None:
+    if state_decided is None:
         # Set leader to None
         id_leader = None
         continue
