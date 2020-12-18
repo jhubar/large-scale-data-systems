@@ -208,7 +208,7 @@ class Raft:
     def process_decide_on_state(self, request_json):
         # Ask to everyone if state is ok !
         if self.state is State.LEADER:
-            print("Need to send state {}".format(request_json['state']))
+            #print("Need to send state {}".format(request_json['state']))
             self.state_answer.clear()
             for peer in self.fc.get_peers():
                 threading.Thread(target=self._process_replicate_state,
@@ -278,7 +278,7 @@ class Raft:
     def process_decide_on_action(self, request_json):
         # Ask to everyone if Action is ok !
         if self.state is State.LEADER:
-            print("Need to send Action {}".format(request_json['action']))
+            #print("Need to send Action {}".format(request_json['action']))
             self.action_answer.clear()
             for peer in self.fc.get_peers():
                 threading.Thread(target=self._process_replicate_action,

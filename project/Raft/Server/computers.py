@@ -144,6 +144,7 @@ class FlightComputer:
         if "next_stage" in action and action["next_stage"]:
             self.current_stage_index += 1
             self.stage_handler = self.stage_handlers[self.current_stage_index]
+            print("Entering new stage")
 
     def deliver_state(self, state):
         self.state = state
