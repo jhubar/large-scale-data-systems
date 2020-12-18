@@ -48,6 +48,7 @@ def main():
             # Leader maybe crashed...
             id_leader = None
             continue
+        print(action.json())
         # check if action is None, i.e it means consensus is done
         id_leader = change_leader(action.json()['leader'], id_leader)
         if action.json()['action'] is None:

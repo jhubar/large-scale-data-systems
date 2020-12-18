@@ -90,7 +90,7 @@ def sample_next_action():
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
-            return error_no_leader()
+            return error_no_leader(action=True)
         return redirect("http://{}:{}/sample_next_action"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
