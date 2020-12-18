@@ -23,6 +23,7 @@ def main():
         if id_leader is None:
             # Randomly select a server
             id_leader = select_leader(servers)
+        print()
         print("Replicate this state")
         # Try replicate the action
         state_dict = {}
@@ -54,6 +55,7 @@ def main():
             continue
 
         print('LEADER! Replicate this action')
+        print()
         action_dict = {}
         action_dict['action'] = action.json()['action']
         # Ask to leader to replicate this action

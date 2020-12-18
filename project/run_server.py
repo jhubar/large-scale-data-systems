@@ -105,6 +105,7 @@ def sample_next_action():
 
 
 def error_no_leader():
+    response = {}
     response['leader'] = None
     response['status'] = False
     return jsonify(response)
