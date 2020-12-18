@@ -18,8 +18,9 @@ def main():
     servers = get_servers()
     id_leader = None
     while not complete:
-        timestep += 1
-        print("Trying to replicate at timestep = {}".format(timestep))
+
+        # timestep += 1
+        # print("Trying to replicate at timestep = {}".format(timestep))
         state = readout_state(timestep)
         if id_leader is None:
             # Randomly select a server
@@ -27,7 +28,10 @@ def main():
         # Try replicate the action
         state_dict = {}
         state_dict['state'] = state
+        test = state_dict['state']
+        print(test['altitude'])
         state_decided = send_post(id_leader, 'decide_on_state', state_dict, TIMEOUT=0.075)
+
 
         # Check if no answer from the server
         if state_decided is None:
@@ -42,6 +46,7 @@ def main():
 
         # Check the action that the leader will try to replicate
         action = send_post(id_leader, 'sample_next_action', {}, TIMEOUT=0.075)
+        
         if action is None:
             # Leader maybe crashed...
             id_leader = None
@@ -66,7 +71,7 @@ def main():
 
         id_leader = change_leader(action_decided.json()['leader'], id_leader)
         if action_decided.json()['status']:
-            execute_action(action.json()['action'], timestep)
+            execute_action(action.json()['action'], timestep,1)
         else:
             timestep -= 1
 
@@ -78,7 +83,7 @@ def main():
 def readout_state(timestep):
     return states[timestep]
 
-def execute_action(action, timestep):
+def execute_action(action, timestep,handleStage):
     for k in action.keys():
         assert(action[k] == actions[timestep][k])
 
