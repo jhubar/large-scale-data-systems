@@ -7,6 +7,6 @@ class ActionAnswer(Message):
     lastLogIndex: index of candidate's last log entry
     lastLogTerm: term of candidate's last log entry
     """
-    def __init__(self, answer):
+    def __init__(self, answer, handleStage):
         super(ActionAnswer, self).__init__()
         self.answer = answer

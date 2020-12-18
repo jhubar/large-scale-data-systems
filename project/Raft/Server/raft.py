@@ -22,6 +22,7 @@ class Raft:
         self.state = State.FOLLOWER
         self.votedFor = None
         self.index = 0
+        self.handleStage = 1
         self.currentTerm = 0
         # Flight Computer object
         self.fc = fc
@@ -81,7 +82,7 @@ class Raft:
                                        peer)).start()
 
     def run_election(self, term, index, peer):
-        message = VoteRequest(term, self.id, index).get_message()
+        message = VoteRequest(term, self.id, index, self.handleStage).get_message()
         # Post method
         url = "vote_request"
         while self.state is State.CANDIDATE and term is self.currentTerm:
@@ -124,10 +125,10 @@ class Raft:
             self.currentTerm = request_json['term']
             self.votedFor = request_json['candidateID']
             self.election_timer.reset()
-            answer = VoteAnswer(True, self.currentTerm).get_message()
+            answer = VoteAnswer(True, self.currentTerm,self.handleStage).get_message()
         else:
             # The FOLLOWER raft server cannot grant this candidate
-            answer = VoteAnswer(False, self.currentTerm).get_message()
+            answer = VoteAnswer(False, self.currentTerm,self.handleStage).get_message()
 
         return answer
 
@@ -167,7 +168,7 @@ class Raft:
     """
     def _heartbeat(self, peer):
         url = 'heartbeat'
-        message = Heartbeat(self.currentTerm, self.index, self.id).get_message()
+        message = Heartbeat(self.currentTerm, self.index, self.id, self.handleStage).get_message()
         with self.rpc_lock[self._get_id_tuple(peer)]:
             reply = send_post(peer, url, message)
             if reply is not None and self.state is State.LEADER:
@@ -190,13 +191,15 @@ class Raft:
             return HeartbeatAnswer(self.currentTerm,
                                    self.index,
                                    self.id,
-                                   False).get_message()
+                                   False
+                                   ,self.handleStage).get_message()
         # Yes he is my antoine Oh god!!.
         self.election_timer.reset()
         return HeartbeatAnswer(self.currentTerm,
                                self.index,
                                self.id,
-                               True).get_message()
+                               True
+                               ,self.handleStage).get_message()
 
 
     def process_decide_on_command(self, request_json):
@@ -277,6 +280,13 @@ class Raft:
         self.index += 1
         return True
 
+    def process_deliver_handleStage(self, state_request):
+        # Need to simulate heartbeat
+        self.election_timer.reset()
+        self.fc.deliver_state(state_request['state'])
+        self.handleStage += 1
+        return True
+
     def _process_replicate_action(self, peer, action):
         with self.rpc_lock[self._get_id_tuple(peer)]:
             url = 'acceptable_action'
@@ -306,7 +316,7 @@ class Raft:
         # TODO: Handle slow here with lock
         try:
             self.election_timer.reset()
-            return ActionAnswer(self.fc.acceptable_action(request_action['action'])).get_message()
+            return ActionAnswer(self.fc.acceptable_action(request_action['action']),self.handleStage).get_message()
         except Exception as e:
             print(e)
             print("IT'S A TRAP")
