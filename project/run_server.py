@@ -96,7 +96,7 @@ def sample_next_action():
                                  leader_id['port']),\
                          code=307)
     elif raft.state is State.CANDIDATE:
-        return error_no_leader()
+        return error_no_leader(action=True)
     else:
         response = {}
         response['leader'] = raft.id
@@ -104,10 +104,12 @@ def sample_next_action():
         return jsonify(response)
 
 
-def error_no_leader():
+def error_no_leader(action=False):
     response = {}
     response['leader'] = None
     response['status'] = False
+    if action:
+        response['action'] = -1
     return jsonify(response)
 
 def parse_arguments():

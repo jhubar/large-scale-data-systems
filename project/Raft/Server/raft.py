@@ -28,7 +28,7 @@ class Raft:
         self.fc = fc
         self.id = id
         # Raft information
-        self.election_timer = RaftRandomTime(1.0, 2.0, self.time_out, args=())
+        self.election_timer = RaftRandomTime(0.150, 0.500, self.time_out, args=())
         self.vote = 0
         self.majority = math.floor((len(peers) + 1) / 2) + 1
         for peer in peers:
@@ -44,7 +44,7 @@ class Raft:
         heartbeat_timer = {}
         for peer in peers:
             heartbeat_timer[self._get_id_tuple(peer)] = \
-                RaftTimer(0.5, self._heartbeat, args=(peer,))
+                RaftTimer(0.075, self._heartbeat, args=(peer,))
         return heartbeat_timer
 
     def _init_rpc_lock(self, peers):

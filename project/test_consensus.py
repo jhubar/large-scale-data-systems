@@ -53,6 +53,9 @@ def main():
         if action.json()['action'] is None:
             complete = True
             continue
+        elif action.json()['action'] == -1:
+            # No leader
+            continue
 
         print('LEADER! Replicate this action')
         print()
