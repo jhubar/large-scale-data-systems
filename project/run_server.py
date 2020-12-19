@@ -63,6 +63,49 @@ def acceptable_state():
 def deliver_state():
     return jsonify(raft.process_deliver_state(request.json))
 
+@app.route('/what_to_do', methods=['POST'])
+def what_to_do():
+    msg = request.json
+    if msg['term'] >= raft.currentTerm:
+        raft.beatLock = True
+        action = raft.fc.sample_next_action()
+        raft.beatLock = False
+        return jsonify(action)
+
+
+
+
+@app.route('/excute_action', methods= ['POST'])
+def excute_action():
+    msg = request.json
+    if msg['term'] >= raft.currentTerm:
+        raft.fc.deliver_action(msg['action'])
+        return jsonify(True)
+
+
+@app.route('/action_consensus', methods= ['POST'])
+def action_consensus():
+    print("action_consensus check")
+    if raft.state is State.FOLLOWER:
+        leader_id = raft.votedFor
+        if leader_id is None:
+            return error_no_leader()
+        return redirect("http://{}:{}/decide_on_action"\
+                         .format(leader_id['host'],\
+                                 leader_id['port']),\
+                         code=307)
+    elif raft.state is State.CANDIDATE:
+        return error_no_leader()
+    else:
+        print("action_consensus check leader")
+        response = {}
+        response['leader'] = raft.id
+        response['status'] = raft.process_action_consensus(request.json)
+        print("action_consensus check"+str(response['status']))
+        return jsonify(response)
+
+
+
 @app.route('/decide_on_action', methods=['POST'])
 def decide_on_action():
     if raft.state is State.FOLLOWER:

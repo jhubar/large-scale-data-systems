@@ -104,7 +104,9 @@ class FlightComputer:
         self.completed = True
 
     def sample_next_action(self):
-        return self.stage_handler()
+        next_action =self.stage_handler()
+        print(next_action)
+        return next_action
 
     # def decide_on_state(self, state):
     #     acceptations = [p.acceptable_state(state) for p in self.peers]
@@ -141,7 +143,10 @@ class FlightComputer:
         return accept
 
     def deliver_action(self, action):
+        print("=========================")
+        print("deliver_action"+str(action))
         if "next_stage" in action and action["next_stage"]:
+
             self.current_stage_index += 1
             self.stage_handler = self.stage_handlers[self.current_stage_index]
             print("Entering new stage")

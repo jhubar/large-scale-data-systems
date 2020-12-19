@@ -127,7 +127,7 @@ class Raft:
             answer = VoteAnswer(True, self.currentTerm,self.fc.current_stage_index).get_message()
         else:
             # The FOLLOWER raft server cannot grant this candidate
-            answer = VoteAnswer(False, self.currentTerm,self.fc.current_stage_index).get_message()
+            answer = VoteAnswer(False, self.currentTerm,self.fc.current_stage_inRadex).get_message()
 
         return answer
 

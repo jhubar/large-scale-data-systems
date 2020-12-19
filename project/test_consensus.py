@@ -30,7 +30,7 @@ def main():
         state_dict['state'] = state
         print(state)
         state_decided = send_post(id_leader, 'decide_on_state', state_dict, TIMEOUT=0.075)
-
+        time.sleep(5)
 
         # Check if no answer from the server
         if state_decided is None:
@@ -44,34 +44,38 @@ def main():
             continue
 
         # Check the action that the leader will try to replicate
-        action = send_post(id_leader, 'sample_next_action', {}, TIMEOUT=0.075)
-
+        aws = send_post(id_leader, 'action_consensus', {}, TIMEOUT=0.075)`
+        if aws is None:
+            continue
+        print("++++++++++++++++++++++")
+        action = aws.json()['status']
+        print("action"+str(action))
         if action is None:
             # Leader maybe crashed...
             id_leader = None
             continue
         # check if action is None, i.e it means consensus is done
-        id_leader = change_leader(action.json()['leader'], id_leader)
-        if action.json()['action'] is None:
+        id_leader = change_leader(action['leader'], id_leader)
+        if action['action'] is None:
             complete = True
             continue
-        elif action.json()['action'] == -1:
+        elif action['action'] == -1:
             # No leader
             continue
 
-        action_dict = {}
-        action_dict['action'] = action.json()['action']
+        # action_dict = {}
+        # action_dict['action'] = action['action']
         # Ask to leader to replicate this action
-        action_decided = send_post(id_leader, 'decide_on_action', action_dict, TIMEOUT=0.075)
+        # action_decided = send_post(id_leader, 'decide_on_action', action_dict, TIMEOUT=0.075)
 
-        if action_decided is None:
-            id_leader = None
-            timestep -= 1
-            continue
+        # if action_decided is None:
+        #     id_leader = None
+        #     timestep -= 1
+        #     continue
 
-        id_leader = change_leader(action_decided.json()['leader'], id_leader)
-        if action_decided.json()['status']:
-            execute_action(action.json()['action'], timestep,1)
+        # id_leader = change_leader(action_decided.json()['leader'], id_leader)
+        # if action_decided.json()['status']:
+            # execute_action(action.json()['action'], timestep,1)
         else:
             timestep -= 1
 
@@ -83,7 +87,7 @@ def main():
 def readout_state(timestep):
     return states[timestep]
 
-def execute_action(action, timestep,handleStage):
+def execute_action(action, timestep):
     keys = ["pitch", "throttle","heading","stage","next_state"]
 
     for k in keys:
