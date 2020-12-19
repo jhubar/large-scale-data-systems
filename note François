@@ -1,0 +1,48 @@
+Alors, voilà comment j’envisage l’algo après mes réflexions de ce soir :
+Ce serait toujours un raft de base avec le scénario suivant :
+1.	Le leader reçoit du « client » un état. Il broadcast cet état à tout le monde.
+2.	Tout le monde, dont le leader, met à jour sa variable d’instance state dans
+flight computer, et fait un « sample next action ». Le leader fait pareil.
+3.	Les followers retournent au leader l’action décidée et lancent un chrono
+spécial qui ne s’arrêtera que en cas de réponse d’un état décidé par consensus.
+ Ce chrono ne doit donc pas s’arrêter en cas de heart beat normal qui pourrait
+ éventuellement persister pendant qu’un slow flight computer tente de prendre sa
+ décision.
+4.	Si le leader est slow, il ne va pas réussir à prendre sa décision dans le
+temps imparti et une nouvelle élection va se déclencher.
+Si le leader n’est pas slow (normal ou biz) il contabilise les actions reçues,
+y ajoute la sienne et décide de la majoritaire. Si c’est un byzantin, il ne sera
+ pas d’accord avec la majorité, mais vu qu’il est fairplay, il écoutera la majorité.
+5.	L’action majoritaire est broadcastée à tout le monde. Si cette action arrive
+bien avant la fin du timer précédemment déclenché chez les followers, une réponse
+TRUE est répondue au leader, et un timer normal de Raft est à nouveau actionné.
+6.	Uniquement à partir du momment ou le leader a reçu plus de la moitié de TRUE
+(lui compris), il peut répondre au client l’action exécutée. Le cycle peut alors
+ recommencer. S’il ne reçoit pas de réponse de la majorité, c’est qu’il y a une
+ couille dans le pâté, du coup ça va aboutir sur des time out chez la majorité
+ des followers et de nouvelles élections vont être lancées sans que le client ne
+  reçoive de réponse.
+
+Du coup, le seul truc à éventuellement devoir mettre à jour en cas de retard,
+c’est l’index « current_stage_index ». Une autre façon très efficace d’effacer
+ le retard de certains nœuds serait de dédire le current-stage_index uniquement
+  à partir des variables de l’état, c’est-à-dire de l’altitude, etc.
+Dans les erreurs potentielles :
+•	Eventuelle mauvaise gestion des timers : est ce que l’on reset bien les timers
+ pour tous les messages autres que les heart beat normaux ?
+•	La clé Next_State dans les actions à prendre ? Ca serait probablement une erreur
+du prof avec Next Stage qu’il utilise finalement… Mais du coup est ce que le fait
+que nos dictionnaires n’ont pas la même taille ne risque pas eventuellement de
+faire planter le bazarre uand on compare des actions ? on avait un momment des
+erreurs de dictionnaires.
+Notes :
+•	Globalement, en regardant les états, on a à chaque fois 7 répétitions du même
+état à la suite. Ca veut dire que lorsque l’on arrive à un momment critique,
+c’est-à-dire au momment ou on doit incrémenter handle stage index, on a droit à
+6 tentatives foireuses avant de planter le zinc. Ca nous laisse quand même une
+certaine marge.
+•	Comme déjà dit plus haut, hormi pour faire sample next action, les byzantins
+ont un comportement normal. Donc ils sont tout à fait aptes à organiser le
+consensus. Un byzantin peut donc très bien faire son job de leader. Même s’il
+n’est pas d’accord avec les autres sur l’action à retourner, du momment qu’il
+retourne l’action majoritaire, tout ira très bien.

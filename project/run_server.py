@@ -85,6 +85,28 @@ def decide_on_action():
 def acceptable_action():
     return jsonify(raft.process_acceptable_action(request.json))
 
+@app.route('/next_handle_stage', methods=['POST'])
+def decide_on_handle_stage():
+    if raft.state is State.FOLLOWER:
+        leader_id = raft.votedFor
+        if leader_id is None:
+            return error_no_leader()
+        return redirect("http://{}:{}/decide_on_action"\
+                         .format(leader_id['host'],\
+                                 leader_id['port']),\
+                         code=307)
+    elif raft.state is State.CANDIDATE:
+        return error_no_leader()
+    else:
+        response = {}
+        response['leader'] = raft.id
+        response['status'] = raft.process_decide_on_command(request.json)
+        return jsonify(response)
+
+@app.route('/deliver_handle_stage', methods=['POST'])
+def deliver_handle_stage():
+    return jsonify(raft.process_deliver_handle_stage(request.json))
+
 @app.route('/sample_next_action', methods=['POST'])
 def sample_next_action():
     if raft.state is State.FOLLOWER:

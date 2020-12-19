@@ -1,40 +1,13 @@
-# Flask for each FLight Computer. The raft server implements Raft Consensus Algorithm
-
-from .state import State
-from collections import Counter
-from ..Abstraction.timer import RaftRandomTime, RaftTimer
-from ..RPC.request_vote import VoteAnswer, VoteRequest
-from ..RPC.heartbeat import Heartbeat, HeartbeatAnswer
-from ..RPC.action_answer import ActionAnswer
-from ..Abstraction.send import *
-import json
-import math
-import threading
-import logging
-import time
-import os
-import sys
-from enum import Enum
+from state import State
 
 class Raft:
-    def __init__(self, fc, id, peers=[]):
-        # Common to all raft server
+    def __init__(self, rocket, id , peers=[]):
         self.state = State.FOLLOWER
-        self.votedFor = None
-        self.index = 0
         self.currentTerm = 0
-        # Flight Computer object
+        self.votedFor = None
+        #Flight computer object
         self.fc = fc
         self.id = id
-        # Raft information
-        self.election_timer = RaftRandomTime(0.150, 0.500, self.time_out, args=())
-        self.vote = 0
-        self.majority = math.floor((len(peers) + 1) / 2) + 1
-        for peer in peers:
-            self.fc.add_peer(peer)
-        # Various variable (Locks, etc)
-        self.rpc_lock = self._init_rpc_lock(peers)
-        self.increment_vote_lock = threading.Lock()
         # Only Leader handles these variables
         self.heartbeat_timer = self._init_heartbeat_timer(peers)
         self.command_answer = {}
@@ -46,15 +19,8 @@ class Raft:
                 RaftTimer(0.075, self._heartbeat, args=(peer,))
         return heartbeat_timer
 
-    def _init_rpc_lock(self, peers):
-        rpc_lock = {}
-        for peer in peers:
-            rpc_lock[self._get_id_tuple(peer)] = threading.Lock()
-        return rpc_lock
-
     def start_raft(self):
         self.election_timer.start()
-
     """
     Election handler
     """
@@ -80,11 +46,15 @@ class Raft:
                                        self.index,
                                        peer)).start()
 
+
     def run_election(self, term, index, peer):
         message = VoteRequest(term, self.id, index, self.fc.current_stage_index).get_message()
         # Post method
         url = "vote_request"
-        while self.state is State.CANDIDATE and term is self.currentTerm:
+        while self.state is State.CANDIDATE
+                and term is self.currentTerm
+                # Si t'es pas au bon stage tu peux pas lancer d'election
+                and _goodStage(self.fc.current_stage_index):
             reply = send_post(peer, url, message)
             if reply is not None and self.state is State.CANDIDATE:
                 if reply.json()['voteGranted']:
@@ -107,7 +77,7 @@ class Raft:
         Raft server deciding a vote request from a candidate
         """
         answer = None
-
+        # # TODO: Rajouter une condition sur le handle stage
         if self.currentTerm < request_json['term']:
             # Ensure that the raft server stays or become a follower in this case
             self._become_follower(request_json['term'])
@@ -131,6 +101,8 @@ class Raft:
 
         return answer
 
+
+
     def _become_follower(self, term):
         """
         Cancel the election of a candidate
@@ -153,14 +125,12 @@ class Raft:
                 self.heartbeat_timer[self._get_id_tuple(peer)]\
                                          .start_with_time(0)
 
-
     def _check_consistent_vote(self, candidateID):
         if self.votedFor is None or self.votedFor is candidateID:
             # The raft server has not voted yet, or already voted for this candidate
             return True
         # The raft server cannot vote for this candidate
         return False
-
 
     """
     Heartbeat Handler
@@ -200,7 +170,6 @@ class Raft:
                                True
                                ,self.fc.current_stage_index).get_message()
 
-
     def process_decide_on_command(self, request_json):
         # Ask to everyone if state is ok !
         if self.state is State.LEADER:
@@ -215,6 +184,12 @@ class Raft:
                 deliver_function = self._deliver_state
                 fc_deliver_function = self.fc.deliver_state
                 key = 'state'
+            elif 'handle_stage' in request_json:
+                acceptable_function = self._process_replicate_handle_stage
+                deliver_function = self._deliver_handle_stage
+                fc_deliver_function = self.fc.deliver_handle_stage
+                key = 'handle_stage'
+
             else:
                 return (False, "Bad command")
             self.command_answer.clear()
@@ -247,6 +222,9 @@ class Raft:
                 self.election_timer.reset_grumble()
             return decided
 
+    """
+    1. on replique
+    """
     def _process_replicate_state(self, peer, state):
         with self.rpc_lock[self._get_id_tuple(peer)]:
             url = 'acceptable_state'
@@ -258,6 +236,9 @@ class Raft:
             else:
                 self.command_answer[self._get_id_tuple(peer)] = True
 
+    """
+    2. on délivre
+    """
     def _deliver_state(self, peer, state):
         with self.rpc_lock[self._get_id_tuple(peer)]:
             url = 'deliver_state'
@@ -278,8 +259,6 @@ class Raft:
         self.fc.deliver_state(state_request['state'])
         self.index += 1
         return True
-
-
 
     def _process_replicate_action(self, peer, action):
         with self.rpc_lock[self._get_id_tuple(peer)]:
@@ -316,28 +295,37 @@ class Raft:
             print("IT'S A TRAP")
             os._exit(-1)
 
-    def process_deliver_action(self, action_request):
-        # Need to simulate heartbeat
-        self.election_timer.reset()
-        self.fc.deliver_action(action_request['action'])
-        self.index += 1
-        return True
+    def _process_replicate_handle_stage(self, peer, handle_stage):
+        with self.rpc_lock[self._get_id_tuple(peer)]:
+            url = 'handle_stage'
+            message = handle_stage
+            reply = send_post(peer, url, message)
+            if reply is None:
+                self.command_answer[self._get_id_tuple(peer)] = False
+                self.heartbeat_timer[self._get_id_tuple(peer)].reset()
+            else:
+                self.command_answer[self._get_id_tuple(peer)] = True
 
-    """
-    When leader ask for sample_next_action
-    """
-    def process_sample_next_action(self):
-        if self.state is State.LEADER:
-            try:
-                return self.fc.sample_next_action()
-            except Exception as e:
-                print(e)
-                print("IT'S A TRAP")
-                os._exit(-1)
+    def _deliver_handle_stage(self, peer, action):
+        with self.rpc_lock[self._get_id_tuple(peer)]:
+            url = 'handle_stage'
+            message = handle_stage
+            reply = send_post(peer, url, message)
+            if reply is not None:
+                self.heartbeat_timer[self._get_id_tuple(peer)].reset()
+                self.command_answer[self._get_id_tuple(peer)] = True
+            else:
+                self.command_answer[self._get_id_tuple(peer)] = False
 
-    """
-    Various function
-    """
 
-    def _get_id_tuple(self, peer):
-        return (peer['host'], peer['port'])
+    def process_deliver_handle_stage():
+        pass
+
+
+    def _goodStage(stage):
+        # TODO: trouver le stage majority actuelle
+        # TODO: prendre celui du leader
+        if stage ==
+            return True
+        else:
+            return False
