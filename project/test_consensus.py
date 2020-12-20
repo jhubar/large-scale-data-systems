@@ -13,7 +13,7 @@ actions = pickle.load(open("data/actions.pickle", "rb"))
 states = pickle.load(open("data/states.pickle", "rb"))
 
 def main():
-    timestep = 0
+    timestep = 3500
     complete = False
     servers = get_servers()
     id_leader = None
@@ -31,7 +31,7 @@ def main():
         state_dict['state'] = state
         state_decided = send_post(id_leader, 'decide_on_state', state_dict, TIMEOUT=0.075)
 
-        print("Decided state: {}".format(state_decided.json()))
+        # print("Decided state: {}".format(state_decided.json()))
         #time.sleep(5)
 
         # Check if no answer from the server
@@ -47,7 +47,7 @@ def main():
 
         # Decide action
         aws = send_post(id_leader, 'action_consensus', {}, TIMEOUT=0.075)
-
+        print(aws)
         if aws is None:
             id_leader = None
             continue
