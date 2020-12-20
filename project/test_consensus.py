@@ -25,7 +25,7 @@ def main():
     while not complete:
 
         timestep += 1
-        time.sleep(1)
+        #time.sleep(1)
         print("Trying to replicate at timestep = {}".format(timestep))
         state = readout_state(timestep)
         if id_leader is None:

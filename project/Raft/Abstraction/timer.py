@@ -13,7 +13,6 @@ class RaftRandomTime:
         self.function = function
         self.args = args
         self.timer = threading.Timer(self._set_raft_time(), self.exec_function)
-        self.block = False
 
     def _set_raft_time(self):
         return random.random()*(self.max_time - self.min_time) + self.min_time
@@ -34,9 +33,9 @@ class RaftRandomTime:
         threading.Thread(target=self.function, args=self.args).start()
 
     def reset(self):
-        if not self.block:
-            self.timer.cancel()
-            self.start()
+        self.timer.cancel()
+        self.start()
+
 
 class RaftTimer:
     def __init__(self, time, function, args=None):

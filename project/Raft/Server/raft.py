@@ -66,6 +66,7 @@ class Raft:
     Election handler
     """
     def time_out(self):
+        self.beats_blocker = False
         if self.state is State.LEADER:
             return
         else:
@@ -195,6 +196,9 @@ class Raft:
             self._become_follower(heartbeat_request['term'])
             self.votedFor = heartbeat_request['id']
 
+            # Update to actual term
+            self.currentTerm = heartbeat_request['term']
+
         if heartbeat_request['term'] < self.currentTerm:
             # Oups, i don't trust him
             return HeartbeatAnswer(self.currentTerm,
@@ -226,33 +230,37 @@ class Raft:
         majority = False
         decided_action = {}
         while not majority:
+            tmp_what_to_do = {}
+            # Make a copy to analyze
             with self.followers_what_to_do_loc[self._get_id_tuple(peer)]:
-                tmp_actions = []
-                tmp_counter = []
+                tmp_what_to_do = self.followers_actions.copy()
 
-                for ky in self.followers_actions.keys():
-                    if self.followers_actions[ky] in tmp_actions:
-                        for i in range(0, len(tmp_actions)):
-                            if self.followers_actions[ky] == tmp_actions[i]:
-                                tmp_counter[i] += 1
-                                break
-                    else:
-                        tmp_actions.append(self.followers_actions[ky])
-                        tmp_counter.append(1)
+            tmp_actions = []
+            tmp_counter = []
 
-                # Check majority
-                for i in range(0, len(tmp_counter)):
-                    if tmp_counter[i] > len(self.fc.peers) / 2:
-                        majority = True
-                        decided_action = tmp_actions[i]
-                        """
-                        print('P_action_consensus: Done')
-                        print('action type : {}'.format(tmp_actions[i]))
-                        print('len of tmp_action: {}'.format(len(tmp_actions)))
-                        print('tmp actions array: {}'.format(tmp_actions))
-                        print('tmp_counter array: {}'.format(tmp_counter))
-                        print('best: {}'.format(decided_action))
-                        """
+            for ky in tmp_what_to_do.keys():
+                if tmp_what_to_do[ky] in tmp_actions:
+                    for i in range(0, len(tmp_actions)):
+                        if tmp_what_to_do[ky] == tmp_actions[i]:
+                            tmp_counter[i] += 1
+                            break
+                else:
+                    tmp_actions.append(tmp_what_to_do[ky])
+                    tmp_counter.append(1)
+
+            # Check majority
+            for i in range(0, len(tmp_counter)):
+                if tmp_counter[i] > len(self.fc.peers) / 2:
+                    majority = True
+                    decided_action = tmp_actions[i]
+                    """
+                    print('P_action_consensus: Done')
+                    print('action type : {}'.format(tmp_actions[i]))
+                    print('len of tmp_action: {}'.format(len(tmp_actions)))
+                    print('tmp actions array: {}'.format(tmp_actions))
+                    print('tmp_counter array: {}'.format(tmp_counter))
+                    print('best: {}'.format(decided_action))
+                    """
 
         # Broadcast action to each others
 
