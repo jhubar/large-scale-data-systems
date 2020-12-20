@@ -15,6 +15,7 @@ import time
 import os
 import sys
 from enum import Enum
+from flask import Flask, request, jsonify, redirect
 
 class Raft:
     def __init__(self, fc, id, peers=[]):
@@ -261,6 +262,11 @@ class Raft:
                     print('tmp_counter array: {}'.format(tmp_counter))
                     print('best: {}'.format(decided_action))
                     """
+                    # Test
+                    print('========== Consensus Checking ============')
+                    print('tmp_actions: {}'.format(tmp_actions))
+                    print('tmp_counter: {}'.format(tmp_counter))
+
 
         # Broadcast action to each others
 
@@ -288,7 +294,7 @@ class Raft:
 
             reply = send_post(peer, url, req, TIMEOUT=0.075)
 
-            if reply is None:
+            if reply is None or reply.json()['asw'] is False:
                 return
             else:
                 self.follower_exec_action.append(True)
@@ -297,13 +303,15 @@ class Raft:
 
     def _process_what_to_do(self, peer):
 
+        req = {}
+        req['term'] = self.currentTerm
+        req['message'] = {}
+        url = 'what_to_do'
+        reply = send_post(peer, url, req, TIMEOUT=0.075)
+        if reply is None or reply.json()['asw'] is False:
+            return
         with self.followers_what_to_do_loc[self._get_id_tuple(peer)]:
-            req = {}
-            req['term'] = self.currentTerm
-            req['message'] = {}
-            url = 'what_to_do'
-            reply = send_post(peer, url, req, TIMEOUT=0.075)
-            self.followers_actions[str(peer['port'])] = reply.json()
+            self.followers_actions[str(peer['port'])] = reply.json()['action']
 
 
 

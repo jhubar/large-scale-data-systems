@@ -24,6 +24,7 @@ class FlightComputer:
 
         # Testing value:
         self.deliver_action_idx = 0
+        self.type = 'Normal'
 
     def add_peer(self, peer):
         self.peers.append(peer)
@@ -108,7 +109,7 @@ class FlightComputer:
 
     def sample_next_action(self):
         next_action =self.stage_handler()
-        print(next_action)
+        #print(next_action)
         return next_action
 
     # def decide_on_state(self, state):
@@ -169,6 +170,7 @@ class FullThrottleFlightComputer(FlightComputer):
 
     def __init__(self, state):
         super(FullThrottleFlightComputer, self).__init__(state)
+        self.type = 'Full Throttle'
 
     def sample_next_action(self):
         action = super(FullThrottleFlightComputer, self).sample_next_action()
@@ -181,6 +183,7 @@ class RandomThrottleFlightComputer(FlightComputer):
 
     def __init__(self, state):
         super(RandomThrottleFlightComputer, self).__init__(state)
+        self.type = 'Random Throttle'
 
     def sample_next_action(self):
         action = super(RandomThrottleFlightComputer, self).sample_next_action()
@@ -193,6 +196,7 @@ class SlowFlightComputer(FlightComputer):
 
     def __init__(self, state):
         super(SlowFlightComputer, self).__init__(state)
+        self.type = 'slow'
 
     def sample_next_action(self):
         action = super(SlowFlightComputer, self).sample_next_action()
@@ -205,6 +209,7 @@ class CrashingFlightComputer(FlightComputer):
 
     def __init__(self, state):
         super(CrashingFlightComputer, self).__init__(state)
+        self.type = 'crashing'
 
     def sample_next_action(self):
         action = super(CrashingFlightComputer, self).sample_next_action()
@@ -223,5 +228,7 @@ def allocate_random_flight_computer(state):
         SlowFlightComputer,
         CrashingFlightComputer,
     ]
+    choice = computers[np.random.randint(0, len(computers))](state)
 
-    return computers[np.random.randint(0, len(computers))](state)
+
+    return choice

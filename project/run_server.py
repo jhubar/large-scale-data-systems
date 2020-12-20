@@ -69,7 +69,11 @@ def what_to_do():
     msg = request.json
     if msg['term'] >= raft.currentTerm:
         action = raft.fc.sample_next_action()
-        return jsonify(action)
+        asw = {'asw': True, 'action': action}
+        return jsonify(asw)
+    else:
+        asw = {'asw': False}
+        return jsonify(asw)
 
 
 
@@ -81,7 +85,11 @@ def excute_action():
     if msg['term'] >= raft.currentTerm:
         action = msg.pop('term')
         raft.fc.deliver_action(msg)
-        return jsonify(True)
+        asw = {'asw': True}
+        return jsonify(asw)
+    else:
+        asw = {'asw': False}
+        return jsonify(asw)
 
 #garde
 @app.route('/action_consensus', methods= ['POST'])
@@ -91,16 +99,19 @@ def action_consensus():
         leader_id = raft.votedFor
         if leader_id is None:
             return error_no_leader()
-        return redirect("http://{}:{}/decide_on_action"\
+        print('CHEEECK REDIRECT')
+        return redirect("http://{}:{}/action_consensus"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
                          code=307)
     elif raft.state is State.CANDIDATE:
-        return error_no_leader()
+        return error_no_leader_soft()
     else:
-        response = {}
-        response['leader'] = raft.id
-        response['status'] = raft.process_action_consensus(request.json)
+        response = raft.process_action_consensus(request.json)
+        response['host'] = raft.id['host']
+        response['port'] = raft.id['port']
+        print('-----------------------------')
+        print(response)
         return jsonify(response)
 
 
@@ -174,6 +185,15 @@ def error_no_leader(action=False):
     response['status'] = False
     if action:
         response['action'] = -1
+    print('CHECK ERROR NO LEADER =========')
+    return jsonify(response)
+
+def error_no_leader_soft(action=False):
+    response = {}
+    response['host'] = None
+    if action:
+        response['action'] = -1
+    print('CHECK ERROR NO LEADER =========')
     return jsonify(response)
 
 def parse_arguments():
@@ -216,5 +236,6 @@ if __name__ == '__main__':
     print(fc)
     raft = Raft(fc, raft_id, peers)
     raft.start_raft()
+    print('Start a new {} flight computer'.format(raft.fc.type))
     # Run Flask app
     app.run(debug=False, host=arguments.host, port=arguments.port)

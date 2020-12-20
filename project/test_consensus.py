@@ -23,16 +23,15 @@ def main():
     good_aws = 0
     to_compare_keys = ['pitch', 'throttle', 'heading', 'stage', 'next_state']
     while not complete:
-
         timestep += 1
         #time.sleep(1)
         print("Trying to replicate at timestep = {}".format(timestep))
+
         state = readout_state(timestep)
         if id_leader is None:
             # Randomly select a server
             id_leader = select_leader(servers)
         # Try replicate the action
-
         state_dict = {}
         state_dict['state'] = state
         state_decided = send_post(id_leader, 'decide_on_state', state_dict, TIMEOUT=0.075)
@@ -59,21 +58,24 @@ def main():
         # Decide action
         aws = None
         aws = send_post(id_leader, 'action_consensus', {}, TIMEOUT=0.075)
+
         if aws is None:
             id_leader = None
             time.sleep(0.5)
             continue
-        if aws.json()['leader'] is None:
+
+        if aws.json()['host'] is None:
             id_leader = None
             time.sleep(0.5)
             continue
-        if aws.json()['status'] is None:
-            time.sleep(0.5)
-            continue
+
+        tmp_leader = {'host': aws.json()['host'], 'port': aws.json()['port']}
 
         print(aws.json())
 
-        action = aws.json()['status']
+        action = aws.json()
+        action.pop('host')
+        action.pop('port')
         print('CONSENSUS ACTION: {}'.format(action))
 
         # Check good predictions proportion:
@@ -83,17 +85,19 @@ def main():
             if original[ky] != action[ky]:
                 is_same = False
         total_aws += 1
+
         if is_same:
             good_aws += 1
 
         print('CONSENSUS-SCORE: good action: {} / {}'.format(good_aws, total_aws))
 
         # check if action is None, i.e it means consensus is done
-        id_leader = change_leader(aws.json()['leader'], id_leader)
+        id_leader = change_leader(tmp_leader, id_leader)
         if action is None:
             complete = True
             time.sleep(0.5)
             continue
+
 
     if complete:
         print("Success!")
