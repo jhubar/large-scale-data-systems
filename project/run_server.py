@@ -21,7 +21,7 @@ app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-
+#garde
 @app.route('/vote_request', methods=['POST'])
 def vote_request():
     """
@@ -36,6 +36,7 @@ def vote_request():
 def get_heartbeat():
     return jsonify(raft.process_heartbeat(request.json))
 
+#garde
 @app.route('/decide_on_state', methods=['POST'])
 def decide_on_state():
     response = {}
@@ -72,7 +73,7 @@ def what_to_do():
 
 
 
-
+#garde
 @app.route('/excute_action', methods= ['POST'])
 def excute_action():
     msg = request.json
@@ -82,7 +83,7 @@ def excute_action():
         raft.fc.deliver_action(msg)
         return jsonify(True)
 
-
+#garde
 @app.route('/action_consensus', methods= ['POST'])
 def action_consensus():
 

@@ -13,7 +13,7 @@ actions = pickle.load(open("data/actions.pickle", "rb"))
 states = pickle.load(open("data/states.pickle", "rb"))
 
 def main():
-    timestep = 3800
+    timestep = 0
     complete = False
     servers = get_servers()
     id_leader = None
@@ -26,6 +26,7 @@ def main():
             # Randomly select a server
             id_leader = select_leader(servers)
         # Try replicate the action
+
         state_dict = {}
         state_dict['state'] = state
         state_decided = send_post(id_leader, 'decide_on_state', state_dict, TIMEOUT=0.075)
@@ -62,26 +63,6 @@ def main():
         if action is None:
             complete = True
             continue
-
-        #elif action == -1:
-            # No leader
-        #    continue
-
-        # action_dict = {}
-        # action_dict['action'] = action['action']
-        # Ask to leader to replicate this action
-        # action_decided = send_post(id_leader, 'decide_on_action', action_dict, TIMEOUT=0.075)
-
-        # if action_decided is None:
-        #     id_leader = None
-        #     timestep -= 1
-        #     continue
-
-        # id_leader = change_leader(action_decided.json()['leader'], id_leader)
-        # if action_decided.json()['status']:
-            # execute_action(action.json()['action'], timestep,1)
-        #else:
-        #    timestep -= 1
 
     if complete:
         print("Success!")
