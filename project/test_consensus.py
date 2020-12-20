@@ -44,11 +44,14 @@ def main():
         if state_decided is None:
             # Set leader to None
             id_leader = None
+            time.sleep(0.5)
             continue
         if state_decided.json()['leader'] is None:
             id_leader = None
+            time.sleep(0.5)
             continue
         if state_decided.json()['status'] is None:
+            time.sleep(0.5)
             continue
         # Check if leader has changed
         id_leader = change_leader(state_decided.json()['leader'], id_leader)
@@ -58,11 +61,14 @@ def main():
         aws = send_post(id_leader, 'action_consensus', {}, TIMEOUT=0.075)
         if aws is None:
             id_leader = None
+            time.sleep(0.5)
             continue
         if aws.json()['leader'] is None:
             id_leader = None
+            time.sleep(0.5)
             continue
         if aws.json()['status'] is None:
+            time.sleep(0.5)
             continue
 
         print(aws.json())
@@ -86,6 +92,7 @@ def main():
         id_leader = change_leader(aws.json()['leader'], id_leader)
         if action is None:
             complete = True
+            time.sleep(0.5)
             continue
 
     if complete:
