@@ -178,7 +178,7 @@ def error_no_leader(action=False):
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--flight-computers-type", type=int, default=0, help="The type of flight computers (Normal=0 or Random=1). (default: 0)")
+    parser.add_argument("--flight-computers-type", type=int, default=1, help="The type of flight computers (Normal=0 or Random=1). (default: 0)")
     parser.add_argument("--port", type=int, default=8000, help="The port of the server (default: 8000).")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="The IP addresses of the server (default: localhost)")
     return parser.parse_known_args()

@@ -201,7 +201,7 @@ class CrashingFlightComputer(FlightComputer):
     def sample_next_action(self):
         action = super(CrashingFlightComputer, self).sample_next_action()
         # 1% probability of a crash
-        if np.random.unifom() <= 0.01:
+        if np.random.uniform() <= 0.01:
             raise Exception("Flight computer crashed")
 
         return action
