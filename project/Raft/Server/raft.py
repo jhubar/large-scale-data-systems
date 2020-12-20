@@ -39,6 +39,12 @@ class Raft:
         self.heartbeat_timer = self._init_heartbeat_timer(peers)
         self.command_answer = {}
 
+        self.followers_actions = {}
+        self.beats_blocker = False
+        self.follower_exec_action = []
+        self.followers_actions_loc = self._init_rpc_lock(peers)
+        self.followers_what_to_do_loc = self._init_rpc_lock(peers)
+
     def _init_heartbeat_timer(self, peers):
         heartbeat_timer = {}
         for peer in peers:
@@ -127,7 +133,7 @@ class Raft:
             answer = VoteAnswer(True, self.currentTerm,self.fc.current_stage_index).get_message()
         else:
             # The FOLLOWER raft server cannot grant this candidate
-            answer = VoteAnswer(False, self.currentTerm,self.fc.current_stage_inRadex).get_message()
+            answer = VoteAnswer(False, self.currentTerm, self.fc.current_stage_index).get_message()
 
         return answer
 
@@ -167,6 +173,9 @@ class Raft:
     """
     def _heartbeat(self, peer):
         url = 'heartbeat'
+        if self.beats_blocker:
+            self.heartbeat_timer[self._get_id_tuple(peer)].reset()
+            return
         message = Heartbeat(self.currentTerm, self.index, self.id, self.fc.current_stage_index).get_message()
         with self.rpc_lock[self._get_id_tuple(peer)]:
             reply = send_post(peer, url, message)
@@ -199,6 +208,89 @@ class Raft:
                                self.id,
                                True
                                ,self.fc.current_stage_index).get_message()
+
+
+    def process_action_consensus(self, request):
+
+        self.followers_actions = {}
+
+        self.beats_blocker = True
+        leader_action = self.fc.sample_next_action()
+        self.beats_blocker = False
+
+        self.followers_actions[str(self.id['port'])] = leader_action
+
+        for peer in self.fc.get_peers():
+            threading.Thread(target=self.process_what_to_do,
+                             args=(peer, )).start()
+
+        majority = False
+        decided_action = {}
+        while not majority:
+
+            tmp_actions = []
+            tmp_counter = []
+
+            for ky in self.followers_actions.keys():
+                if self.followers_actions[ky] in tmp_actions:
+                    for i in range(0, len(tmp_actions)):
+                        if self.followers_actions[ky] == tmp_actions[i]:
+                            tmp_counter[i] += 1
+                            break
+                else:
+                    tmp_actions.append(self.followers_actions[ky])
+                    tmp_counter.append(1)
+
+            # Check majority
+            for i in range(0, len(tmp_counter)):
+                if tmp_counter[i] >= len(self.fc.peers) / 2:
+                    majority = True
+                    decided_action = tmp_actions[i]
+
+        # Broadcast action to each others
+
+        self.follower_exec_action = []
+        for peer in self.fc.get_peers():
+            threading.Thread(target=self.process_execute_action,
+                             args=(peer, decided_action)).start()
+
+        while len(self.follower_exec_action) <= len(self.fc.get_peers()) / 2:
+            continue
+
+        self.fc.deliver_action(decided_action)
+
+        return decided_action
+
+
+    def process_execute_action(self, peer, action):
+
+        with self.followers_actions_loc[self._get_id_tuple(peer)]:
+            req = action
+            req['term'] = self.currentTerm
+            url = 'excute_action'
+
+            reply = send_post(peer, url, req, TIMEOUT=0.075)
+
+            if reply is None:
+                return
+            else:
+                self.follower_exec_action.append(True)
+                self.heartbeat_timer[self._get_id_tuple(peer)].reset()
+
+
+
+
+
+    def process_what_to_do(self, peer):
+
+        with self.followers_what_to_do_loc[self._get_id_tuple(peer)]:
+            req = {}
+            req['term'] = self.currentTerm
+            req['message'] = {}
+            url = 'what_to_do'
+            reply = send_post(peer, url, req, TIMEOUT=0.075)
+            self.followers_actions[str(peer['port'])] = reply
+
 
 
     def process_decide_on_command(self, request_json):

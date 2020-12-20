@@ -38,7 +38,8 @@
   <component name="PropertiesComponent">
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../../../../../LSDS_C" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RunManager">
     <configuration name="project" type="PythonConfigurationType" factoryName="Python">
@@ -75,6 +76,7 @@
       <workItem from="1608309046465" duration="1300000" />
       <workItem from="1608316264384" duration="3788000" />
       <workItem from="1608384004730" duration="1585000" />
+      <workItem from="1608414506612" duration="12038000" />
     </task>
     <servers />
   </component>
@@ -99,5 +101,32 @@
     </state>
     <state x="2660" y="289" key="FileChooserDialogImpl/-1920.615.1280.700/1920.9.1920.1050/0.0.1920.1050/0.1087.1280.689@1920.9.1920.1050" timestamp="1608327114690" />
     <state x="2660" y="280" key="FileChooserDialogImpl/0.0.1280.689/1920.0.1920.1050@1920.0.1920.1050" timestamp="1608387312084" />
+    <state width="1877" height="40" key="GridCell.Tab.0.bottom" timestamp="1608423691580">
+      <screen x="1920" y="0" width="1920" height="1050" />
+    </state>
+    <state width="1877" height="40" key="GridCell.Tab.0.bottom/0.0.1280.689/1920.0.1920.1050@1920.0.1920.1050" timestamp="1608423691580" />
+    <state width="1877" height="40" key="GridCell.Tab.0.center" timestamp="1608423691580">
+      <screen x="1920" y="0" width="1920" height="1050" />
+    </state>
+    <state width="1877" height="40" key="GridCell.Tab.0.center/0.0.1280.689/1920.0.1920.1050@1920.0.1920.1050" timestamp="1608423691580" />
+    <state width="1877" height="40" key="GridCell.Tab.0.left" timestamp="1608423691564">
+      <screen x="1920" y="0" width="1920" height="1050" />
+    </state>
+    <state width="1877" height="40" key="GridCell.Tab.0.left/0.0.1280.689/1920.0.1920.1050@1920.0.1920.1050" timestamp="1608423691564" />
+    <state width="1877" height="40" key="GridCell.Tab.0.right" timestamp="1608423691580">
+      <screen x="1920" y="0" width="1920" height="1050" />
+    </state>
+    <state width="1877" height="40" key="GridCell.Tab.0.right/0.0.1280.689/1920.0.1920.1050@1920.0.1920.1050" timestamp="1608423691580" />
+    <state x="2381" y="170" key="SettingsEditor" timestamp="1608415490491">
+      <screen x="1920" y="0" width="1920" height="1050" />
+    </state>
+    <state x="2381" y="170" key="SettingsEditor/0.0.1280.689/1920.0.1920.1050@1920.0.1920.1050" timestamp="1608415490491" />
+    <state x="428" y="0" width="780" height="737" maximized="true" key="dock-window-1" timestamp="1608415491225">
+      <screen x="0" y="0" width="1280" height="689" />
+    </state>
+    <state x="428" y="0" width="780" height="737" maximized="true" key="dock-window-1/0.0.1280.689/1920.0.1920.1050@1920.0.1920.1050" timestamp="1608415491225" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/LSDS_C$project.coverage" NAME="project Coverage Results" MODIFIED="1608423683941" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>

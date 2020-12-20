@@ -67,9 +67,7 @@ def deliver_state():
 def what_to_do():
     msg = request.json
     if msg['term'] >= raft.currentTerm:
-        raft.beatLock = True
         action = raft.fc.sample_next_action()
-        raft.beatLock = False
         return jsonify(action)
 
 
@@ -78,14 +76,16 @@ def what_to_do():
 @app.route('/excute_action', methods= ['POST'])
 def excute_action():
     msg = request.json
+
     if msg['term'] >= raft.currentTerm:
-        raft.fc.deliver_action(msg['action'])
+        action = msg.pop('term')
+        raft.fc.deliver_action(msg)
         return jsonify(True)
 
 
 @app.route('/action_consensus', methods= ['POST'])
 def action_consensus():
-    print("action_consensus check")
+
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
@@ -97,11 +97,9 @@ def action_consensus():
     elif raft.state is State.CANDIDATE:
         return error_no_leader()
     else:
-        print("action_consensus check leader")
         response = {}
         response['leader'] = raft.id
         response['status'] = raft.process_action_consensus(request.json)
-        print("action_consensus check"+str(response['status']))
         return jsonify(response)
 
 

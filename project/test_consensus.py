@@ -28,40 +28,44 @@ def main():
         # Try replicate the action
         state_dict = {}
         state_dict['state'] = state
-        print(state)
         state_decided = send_post(id_leader, 'decide_on_state', state_dict, TIMEOUT=0.075)
-        time.sleep(5)
+
+        print("Decided state: {}".format(state_decided.json()))
+        #time.sleep(5)
 
         # Check if no answer from the server
         if state_decided is None:
             # Set leader to None
             id_leader = None
             continue
-        # Check if leader has changed
-        id_leader = change_leader(state_decided.json()['leader'], id_leader)
-        if not state_decided.json()['status']:
-            # Consensus failed on State
-            continue
-
-        # Check the action that the leader will try to replicate
-        aws = send_post(id_leader, 'action_consensus', {}, TIMEOUT=0.075)`
-        if aws is None:
-            continue
-        print("++++++++++++++++++++++")
-        action = aws.json()['status']
-        print("action"+str(action))
-        if action is None:
-            # Leader maybe crashed...
+        if state_decided.json()['leader'] is None:
             id_leader = None
             continue
+        # Check if leader has changed
+        id_leader = change_leader(state_decided.json()['leader'], id_leader)
+
+        # Decide action
+        aws = send_post(id_leader, 'action_consensus', {}, TIMEOUT=0.075)
+
+        if aws is None:
+            id_leader = None
+            continue
+        if aws.json()['leader'] is None:
+            id_leader = None
+            continue
+
+        action = aws.json()['status']
+        print('CONSENSUS ACTION: {}'.format(action))
+
         # check if action is None, i.e it means consensus is done
-        id_leader = change_leader(action['leader'], id_leader)
-        if action['action'] is None:
+        id_leader = change_leader(aws.json()['leader'], id_leader)
+        if action is None:
             complete = True
             continue
-        elif action['action'] == -1:
+
+        #elif action == -1:
             # No leader
-            continue
+        #    continue
 
         # action_dict = {}
         # action_dict['action'] = action['action']
@@ -76,8 +80,8 @@ def main():
         # id_leader = change_leader(action_decided.json()['leader'], id_leader)
         # if action_decided.json()['status']:
             # execute_action(action.json()['action'], timestep,1)
-        else:
-            timestep -= 1
+        #else:
+        #    timestep -= 1
 
     if complete:
         print("Success!")
