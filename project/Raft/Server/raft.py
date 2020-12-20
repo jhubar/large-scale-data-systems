@@ -213,9 +213,9 @@ class Raft:
     def process_action_consensus(self, request):
         self.followers_actions = {}
         self.beats_blocker = True
-        leader_action = self.fc.sample_next_action()
+        leader_action = self.process_sample_next_action()
         self.beats_blocker = False
-        
+
         self.followers_actions[str(self.id['port'])] = leader_action
 
         for peer in self.fc.get_peers():
