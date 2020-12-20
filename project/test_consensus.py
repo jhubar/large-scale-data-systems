@@ -13,13 +13,19 @@ actions = pickle.load(open("data/actions.pickle", "rb"))
 states = pickle.load(open("data/states.pickle", "rb"))
 
 def main():
-    timestep = 3500
+    timestep = 0
     complete = False
     servers = get_servers()
     id_leader = None
+
+    # Varibales to count good anwsers proportions
+    total_aws = 0
+    good_aws = 0
+    to_compare_keys = ['pitch', 'throttle', 'heading', 'stage', 'next_state']
     while not complete:
 
         timestep += 1
+        time.sleep(1)
         print("Trying to replicate at timestep = {}".format(timestep))
         state = readout_state(timestep)
         if id_leader is None:
@@ -32,7 +38,7 @@ def main():
         state_decided = send_post(id_leader, 'decide_on_state', state_dict, TIMEOUT=0.075)
 
         # print("Decided state: {}".format(state_decided.json()))
-        #time.sleep(5)
+
 
         # Check if no answer from the server
         if state_decided is None:
@@ -42,21 +48,39 @@ def main():
         if state_decided.json()['leader'] is None:
             id_leader = None
             continue
+        if state_decided.json()['status'] is None:
+            continue
         # Check if leader has changed
         id_leader = change_leader(state_decided.json()['leader'], id_leader)
 
         # Decide action
+        aws = None
         aws = send_post(id_leader, 'action_consensus', {}, TIMEOUT=0.075)
-        print(aws)
         if aws is None:
             id_leader = None
             continue
         if aws.json()['leader'] is None:
             id_leader = None
             continue
+        if aws.json()['status'] is None:
+            continue
+
+        print(aws.json())
 
         action = aws.json()['status']
         print('CONSENSUS ACTION: {}'.format(action))
+
+        # Check good predictions proportion:
+        is_same = True
+        original = actions[timestep]
+        for ky in to_compare_keys:
+            if original[ky] != action[ky]:
+                is_same = False
+        total_aws += 1
+        if is_same:
+            good_aws += 1
+
+        print('CONSENSUS-SCORE: good action: {} / {}'.format(good_aws, total_aws))
 
         # check if action is None, i.e it means consensus is done
         id_leader = change_leader(aws.json()['leader'], id_leader)

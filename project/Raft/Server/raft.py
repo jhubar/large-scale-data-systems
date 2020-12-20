@@ -45,6 +45,7 @@ class Raft:
         self.followers_actions_loc = self._init_rpc_lock(peers)
         self.followers_what_to_do_loc = self._init_rpc_lock(peers)
 
+
     def _init_heartbeat_timer(self, peers):
         heartbeat_timer = {}
         for peer in peers:
@@ -225,35 +226,46 @@ class Raft:
         majority = False
         decided_action = {}
         while not majority:
+            with self.followers_what_to_do_loc[self._get_id_tuple(peer)]:
+                tmp_actions = []
+                tmp_counter = []
 
-            tmp_actions = []
-            tmp_counter = []
+                for ky in self.followers_actions.keys():
+                    if self.followers_actions[ky] in tmp_actions:
+                        for i in range(0, len(tmp_actions)):
+                            if self.followers_actions[ky] == tmp_actions[i]:
+                                tmp_counter[i] += 1
+                                break
+                    else:
+                        tmp_actions.append(self.followers_actions[ky])
+                        tmp_counter.append(1)
 
-            for ky in self.followers_actions.keys():
-                if self.followers_actions[ky] in tmp_actions:
-                    for i in range(0, len(tmp_actions)):
-                        if self.followers_actions[ky] == tmp_actions[i]:
-                            tmp_counter[i] += 1
-                            break
-                else:
-                    tmp_actions.append(self.followers_actions[ky])
-                    tmp_counter.append(1)
-
-            # Check majority
-            for i in range(0, len(tmp_counter)):
-                if tmp_counter[i] >= len(self.fc.peers) / 2:
-                    majority = True
-                    decided_action = tmp_actions[i]
+                # Check majority
+                for i in range(0, len(tmp_counter)):
+                    if tmp_counter[i] > len(self.fc.peers) / 2:
+                        majority = True
+                        decided_action = tmp_actions[i]
+                        """
+                        print('P_action_consensus: Done')
+                        print('action type : {}'.format(tmp_actions[i]))
+                        print('len of tmp_action: {}'.format(len(tmp_actions)))
+                        print('tmp actions array: {}'.format(tmp_actions))
+                        print('tmp_counter array: {}'.format(tmp_counter))
+                        print('best: {}'.format(decided_action))
+                        """
 
         # Broadcast action to each others
 
         self.follower_exec_action = []
         for peer in self.fc.get_peers():
             threading.Thread(target=self._process_execute_action,
-                             args=(peer, decided_action)).start()
+                            args=(peer, decided_action)).start()
 
-        while len(self.follower_exec_action) <= len(self.fc.get_peers()) / 2:
-            continue
+        majority = False
+        while not majority:
+            with self.followers_actions_loc[self._get_id_tuple(peer)]:
+                if len(self.follower_exec_action) > len(self.fc.get_peers()) / 2:
+                    majority = True
 
         self.fc.deliver_action(decided_action)
 
@@ -283,7 +295,7 @@ class Raft:
             req['message'] = {}
             url = 'what_to_do'
             reply = send_post(peer, url, req, TIMEOUT=0.075)
-            self.followers_actions[str(peer['port'])] = reply
+            self.followers_actions[str(peer['port'])] = reply.json()
 
 
 
@@ -296,7 +308,8 @@ class Raft:
                 fc_deliver_function = self.fc.deliver_state
                 key = 'state'
             else:
-                return (False, "Bad command")
+                #return (False, "Bad command")
+                return None
             self.command_answer.clear()
             for peer in self.fc.get_peers():
                 threading.Thread(target=acceptable_function,

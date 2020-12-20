@@ -22,6 +22,9 @@ class FlightComputer:
             self._handle_stage_9]
         self.stage_handler = self.stage_handlers[self.current_stage_index]
 
+        # Testing value:
+        self.deliver_action_idx = 0
+
     def add_peer(self, peer):
         self.peers.append(peer)
 
@@ -143,8 +146,13 @@ class FlightComputer:
         return accept
 
     def deliver_action(self, action):
+
         print("=========================")
-        print("deliver_action: "+str(action))
+        print("deliver_action idx: {} - {}".format(self.deliver_action_idx, action))
+
+        # test:
+        self.deliver_action_idx += 1
+
         if "next_stage" in action and action["next_stage"]:
 
             self.current_stage_index += 1
