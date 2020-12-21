@@ -109,7 +109,7 @@ class FlightComputer:
 
     def sample_next_action(self):
         next_action =self.stage_handler()
-        #print(next_action)
+        print("sample next action: {}".format(next_action))
         return next_action
 
     # def decide_on_state(self, state):
@@ -161,7 +161,7 @@ class FlightComputer:
             print("Entering new stage")
 
     def deliver_state(self, state):
-        #print('Deliver State : {}'.format(state))
+        print('Deliver State : {}'.format(state))
         self.state = state
 
 

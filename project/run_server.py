@@ -39,11 +39,13 @@ def get_heartbeat():
 #garde
 @app.route('/decide_on_state', methods=['POST'])
 def decide_on_state():
-    response = {}
+
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
             return error_no_leader_soft()
+
+        print('DECIDE ON STATE REDIRECTION TO '.format(leader_id['port']))
         return redirect("http://{}:{}/decide_on_state"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
@@ -51,9 +53,12 @@ def decide_on_state():
     elif raft.state is State.CANDIDATE:
         return error_no_leader_soft()
     else:
+        print('CHECK 1')
+        asw = raft.state_consensus(request.json)
         response = {}
         response['host'] = raft.id['host']
         response['port'] = raft.id['port']
+        response['status'] = asw['status']
         return jsonify(response)
 
 @app.route('/acceptable_state', methods=['POST'])
@@ -82,6 +87,7 @@ def what_to_do():
 def excute_action():
     msg = request.json
 
+    """
     if msg['term'] >= raft.currentTerm:
         action = msg.pop('term')
         raft.fc.deliver_action(msg)
@@ -90,6 +96,11 @@ def excute_action():
     else:
         asw = {'asw': False}
         return jsonify(asw)
+    """
+    action = msg.pop('term')
+    raft.fc.deliver_action(msg)
+    asw = {'asw': True}
+    return jsonify(asw)
 
 #garde
 @app.route('/action_consensus', methods= ['POST'])
@@ -99,7 +110,7 @@ def action_consensus():
         leader_id = raft.votedFor
         if leader_id is None:
             return error_no_leader()
-        print('CHEEECK REDIRECT')
+        print('ACTION_CONSENSUS REDIRECTION TO '.format(leader_id['port']))
         return redirect("http://{}:{}/action_consensus"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
@@ -107,7 +118,10 @@ def action_consensus():
     elif raft.state is State.CANDIDATE:
         return error_no_leader_soft()
     else:
+
+        print('hello_1')
         response = raft.process_action_consensus(request.json)
+        print('hello_2')
         response['host'] = raft.id['host']
         response['port'] = raft.id['port']
         print('-----------------------------')

@@ -13,7 +13,7 @@ actions = pickle.load(open("data/actions.pickle", "rb"))
 states = pickle.load(open("data/states.pickle", "rb"))
 
 def main():
-    timestep = 0
+    timestep = 3830
     complete = False
     servers = get_servers()
     id_leader = None
@@ -24,16 +24,18 @@ def main():
     to_compare_keys = ['pitch', 'throttle', 'heading', 'stage', 'next_state']
     while not complete:
         timestep += 1
-        #time.sleep(1)
+        time.sleep(1)
         print("Trying to replicate at timestep = {}".format(timestep))
 
         state = readout_state(timestep)
+        print(state)
         if id_leader is None:
             # Randomly select a server
             id_leader = select_leader(servers)
         # Try replicate the action
         state_dict = {}
         state_dict['state'] = state
+
         state_decided = send_post(id_leader, 'decide_on_state', state_dict, TIMEOUT=0.075)
 
         # print("Decided state: {}".format(state_decided.json()))
@@ -49,6 +51,8 @@ def main():
             id_leader = None
             time.sleep(0.5)
             continue
+        if state_decided.json()['status'] is False:
+            continue
 
         # Check if leader has changed
         tmp_leader = {'host': state_decided.json()['host'], 'port': state_decided.json()['port']}
@@ -57,7 +61,6 @@ def main():
         # Decide action
         aws = None
         aws = send_post(id_leader, 'action_consensus', {}, TIMEOUT=0.075)
-
         if aws is None:
             id_leader = None
             time.sleep(0.5)
@@ -66,6 +69,9 @@ def main():
         if 'host' not in aws.json().keys() or aws.json()['host'] is None:
             id_leader = None
             time.sleep(0.5)
+            continue
+
+        if 'next_state' not in aws.json().keys():
             continue
 
         tmp_leader = {'host': aws.json()['host'], 'port': aws.json()['port']}

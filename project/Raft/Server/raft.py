@@ -110,6 +110,7 @@ class Raft:
                     if reply.json()['term'] > self.currentTerm\
                     and self.state is State.CANDIDATE:
                         # Update and reset some variables
+                        print('Become follower because refus')
                         self._become_follower(reply.json()['term'])
                 return
 
@@ -152,6 +153,7 @@ class Raft:
         self.votedFor = None
         self.vote = 0
         self.election_timer.reset()
+        print('Become follower')
 
     def _become_leader(self):
         if self.state == State.CANDIDATE:
@@ -219,6 +221,8 @@ class Raft:
 
 
     def process_action_consensus(self, request):
+
+        print('CHECK ACTION CONSENSUS')
         self.followers_actions = {}
         self.beats_blocker = False
         leader_action = self.process_sample_next_action()
@@ -232,9 +236,11 @@ class Raft:
 
         majority = False
         decided_action = {}
+        security = 0
         while not majority:
             tmp_what_to_do = {}
             # Make a copy to analyze
+            time.sleep(0.02)
             with self.followers_what_to_do_loc[self._get_id_tuple(peer)]:
                 tmp_what_to_do = self.followers_actions.copy()
 
@@ -268,6 +274,10 @@ class Raft:
                     print('========== Consensus Checking ============')
                     print('tmp_actions: {}'.format(tmp_actions))
                     print('tmp_counter: {}'.format(tmp_counter))
+            security += 1
+            if security >= 3*len(self.fc.get_peers()):
+                return {}
+            print('security first_loop = {}'.format(security))
 
 
         # Broadcast action to each others
@@ -279,9 +289,16 @@ class Raft:
 
         majority = False
         while not majority:
+            time.sleep(0.02)
+            security = 0
             with self.followers_actions_loc[self._get_id_tuple(peer)]:
                 if len(self.follower_exec_action) > len(self.fc.get_peers()) / 2:
                     majority = True
+                if security >= 3*len(self.fc.get_peers()):
+                    return {}
+                print('loop_security : {}'.format(security))
+                security += 1
+
 
         self.fc.deliver_action(decided_action)
         print("Consensus decision: {}".format(decided_action))
@@ -358,9 +375,30 @@ class Raft:
                 self.election_timer.reset_grumble()
             return decided
 
+    def state_consensus(self, state):
+        # Ask to everyone if state is ok !
+        if self.state is State.LEADER:
+            self.command_answer.clear()
+            for peer in self.fc.get_peers():
+                threading.Thread(target=self._process_replicate_state,
+                                 args=(peer, state)).start()
+
+            security = 0
+            again = True
+            while again:
+                print('len: {}'.format(len(self.command_answer)))
+                if len(self.command_answer) >= (len(self.fc.get_peers())+1) / 2:
+                    return {'status': True}
+
+                if security >= 3 * len(self.fc.get_peers()):
+                    return {'status': False}
+                security += 1
+
+        return {'status': False}
+
     def _process_replicate_state(self, peer, state):
         with self.rpc_lock[self._get_id_tuple(peer)]:
-            url = 'acceptable_state'
+            url = 'deliver_state'
             message = state
             reply = send_post(peer, url, message)
             if reply is None:
