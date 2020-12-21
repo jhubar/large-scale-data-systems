@@ -13,7 +13,7 @@ actions = pickle.load(open("data/actions.pickle", "rb"))
 states = pickle.load(open("data/states.pickle", "rb"))
 
 def main():
-    timestep = 3830
+    timestep = 3820
     complete = False
     servers = get_servers()
     id_leader = None

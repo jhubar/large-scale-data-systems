@@ -108,7 +108,7 @@ class FlightComputer:
         self.completed = True
 
     def sample_next_action(self):
-        next_action =self.stage_handler()
+        next_action = self.stage_handler()
         print("sample next action: {}".format(next_action))
         return next_action
 

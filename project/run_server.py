@@ -30,6 +30,7 @@ def vote_request():
               least as up-to-date as receiver’s log, grant vote
     """
     request_json = request.json
+    print("Recois un vote request: {}".format(request_json))
     return jsonify(raft.decide_vote(request_json))
 
 @app.route('/heartbeat', methods=['POST'])
@@ -74,9 +75,11 @@ def what_to_do():
     msg = request.json
     if msg['term'] >= raft.currentTerm:
         action = raft.fc.sample_next_action()
+        print('TEST ACTION: {}'.format(action))
         asw = {'asw': True, 'action': action}
         return jsonify(asw)
     else:
+        print('CHECK ERROR TERM!!!!!!!!!!!!!!')
         asw = {'asw': False}
         return jsonify(asw)
 
@@ -244,7 +247,7 @@ if __name__ == '__main__':
         sys.exit()
     # Initialise the flight computers and the raft. Then start the raft
     fc = None
-    if arguments.type < -1:
+    if arguments.type > -1:
         fc = allocate_specific_flight_computer(states[0], arguments.type)
     else:
         if arguments.flight_computers_type == 0:

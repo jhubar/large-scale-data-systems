@@ -153,7 +153,7 @@ class Raft:
         self.votedFor = None
         self.vote = 0
         self.election_timer.reset()
-        print('Become follower')
+        print('Become follower, term: {}'.format(self.currentTerm))
 
     def _become_leader(self):
         if self.state == State.CANDIDATE:
@@ -200,6 +200,7 @@ class Raft:
         if heartbeat_request['term'] > self.currentTerm:
             self._become_follower(heartbeat_request['term'])
             self.votedFor = heartbeat_request['id']
+            #self.currentTerm = heartbeat_request['term']
 
             # Update to actual term
             self.currentTerm = heartbeat_request['term']
@@ -287,6 +288,7 @@ class Raft:
             threading.Thread(target=self._process_execute_action,
                             args=(peer, decided_action)).start()
 
+        self.fc.deliver_action(decided_action)
         majority = False
         while not majority:
             time.sleep(0.02)
@@ -294,13 +296,13 @@ class Raft:
             with self.followers_actions_loc[self._get_id_tuple(peer)]:
                 if len(self.follower_exec_action) > len(self.fc.get_peers()) / 2:
                     majority = True
-                if security >= 3*len(self.fc.get_peers()):
+                if security >= 10*len(self.fc.get_peers()):
                     return {}
                 print('loop_security : {}'.format(security))
                 security += 1
 
 
-        self.fc.deliver_action(decided_action)
+
         print("Consensus decision: {}".format(decided_action))
         return decided_action
 
@@ -378,6 +380,8 @@ class Raft:
     def state_consensus(self, state):
         # Ask to everyone if state is ok !
         if self.state is State.LEADER:
+            self.fc.deliver_state(state['state'])
+            #print('STATE TEST {}'.format(state['state']))
             self.command_answer.clear()
             for peer in self.fc.get_peers():
                 threading.Thread(target=self._process_replicate_state,
@@ -390,7 +394,7 @@ class Raft:
                 if len(self.command_answer) >= (len(self.fc.get_peers())+1) / 2:
                     return {'status': True}
 
-                if security >= 3 * len(self.fc.get_peers()):
+                if security >= 10 * len(self.fc.get_peers()):
                     return {'status': False}
                 security += 1
 
