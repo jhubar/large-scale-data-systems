@@ -67,7 +67,7 @@ class Raft:
     Election handler
     """
     def time_out(self):
-        self.beats_blocker = False
+        #self.beats_blocker = False
         if self.state is State.LEADER:
             return
         else:
@@ -100,9 +100,11 @@ class Raft:
                     # A follower said yes to this candidate
                     with self.increment_vote_lock:
                         self.vote = self.vote + 1
+                        print('wait votes: {} and state = {}'.format(self.vote, self.state))
                         if self.state is State.CANDIDATE\
                         and self.vote >= self.majority:
                             self._become_leader()
+                            print('Start leader')
                 else:
                     # A follower said No to this candidate
                     if reply.json()['term'] > self.currentTerm\
@@ -218,7 +220,7 @@ class Raft:
 
     def process_action_consensus(self, request):
         self.followers_actions = {}
-        self.beats_blocker = True
+        self.beats_blocker = False
         leader_action = self.process_sample_next_action()
         self.beats_blocker = False
 
@@ -282,7 +284,7 @@ class Raft:
                     majority = True
 
         self.fc.deliver_action(decided_action)
-
+        print("Consensus decision: {}".format(decided_action))
         return decided_action
 
 
@@ -332,7 +334,7 @@ class Raft:
                                  args=(peer, request_json)).start()
             # Wait all responses
             self.command_answer[self._get_id_tuple(self.id)] = True
-            while len(self.command_answer) != (len(self.fc.get_peers()) + 1):
+            while len(self.command_answer) >= (len(self.fc.get_peers()) + 1) / 2:
                 continue
 
             decided = sum(self.command_answer.values()) >= self.majority

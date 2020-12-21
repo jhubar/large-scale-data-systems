@@ -230,5 +230,15 @@ def allocate_random_flight_computer(state):
     ]
     choice = computers[np.random.randint(0, len(computers))](state)
 
+    return choice
+
+def allocate_specific_flight_computer(state, type_idx):
+    computers = [
+        FullThrottleFlightComputer,
+        RandomThrottleFlightComputer,
+        SlowFlightComputer,
+        CrashingFlightComputer,
+    ]
+    choice = computers[type_idx](state)
 
     return choice

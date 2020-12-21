@@ -43,17 +43,17 @@ def decide_on_state():
     if raft.state is State.FOLLOWER:
         leader_id = raft.votedFor
         if leader_id is None:
-            return error_no_leader()
+            return error_no_leader_soft()
         return redirect("http://{}:{}/decide_on_state"\
                          .format(leader_id['host'],\
                                  leader_id['port']),\
                          code=307)
     elif raft.state is State.CANDIDATE:
-        return error_no_leader()
+        return error_no_leader_soft()
     else:
         response = {}
-        response['leader'] = raft.id
-        response['status'] = raft.process_decide_on_command(request.json)
+        response['host'] = raft.id['host']
+        response['port'] = raft.id['port']
         return jsonify(response)
 
 @app.route('/acceptable_state', methods=['POST'])
@@ -193,12 +193,13 @@ def error_no_leader_soft(action=False):
     response['host'] = None
     if action:
         response['action'] = -1
-    print('CHECK ERROR NO LEADER =========')
+    print('CHECK ERROR NO LEADER SOFT =========')
     return jsonify(response)
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--flight-computers-type", type=int, default=0, help="The type of flight computers (Normal=0 or Random=1). (default: 0)")
+    parser.add_argument('--type', type=int, default=-1, help="Specifiy the type of bad computer to create")
     parser.add_argument("--port", type=int, default=8000, help="The port of the server (default: 8000).")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="The IP addresses of the server (default: localhost)")
     return parser.parse_known_args()
@@ -229,10 +230,13 @@ if __name__ == '__main__':
         sys.exit()
     # Initialise the flight computers and the raft. Then start the raft
     fc = None
-    if arguments.flight_computers_type == 0:
-        fc = FlightComputer(states[0])
+    if arguments.type < -1:
+        fc = allocate_specific_flight_computer(states[0], arguments.type)
     else:
-        fc = allocate_random_flight_computer(states[0])
+        if arguments.flight_computers_type == 0:
+            fc = FlightComputer(states[0])
+        else:
+            fc = allocate_random_flight_computer(states[0])
     print(fc)
     raft = Raft(fc, raft_id, peers)
     raft.start_raft()

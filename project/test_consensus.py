@@ -45,15 +45,14 @@ def main():
             id_leader = None
             time.sleep(0.5)
             continue
-        if state_decided.json()['leader'] is None:
+        if state_decided.json()['host'] is None:
             id_leader = None
             time.sleep(0.5)
             continue
-        if state_decided.json()['status'] is None:
-            time.sleep(0.5)
-            continue
+
         # Check if leader has changed
-        id_leader = change_leader(state_decided.json()['leader'], id_leader)
+        tmp_leader = {'host': state_decided.json()['host'], 'port': state_decided.json()['port']}
+        id_leader = change_leader(tmp_leader, id_leader)
 
         # Decide action
         aws = None
@@ -64,7 +63,7 @@ def main():
             time.sleep(0.5)
             continue
 
-        if aws.json()['host'] is None:
+        if 'host' not in aws.json().keys() or aws.json()['host'] is None:
             id_leader = None
             time.sleep(0.5)
             continue
