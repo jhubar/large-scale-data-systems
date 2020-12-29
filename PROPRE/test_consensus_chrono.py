@@ -45,6 +45,10 @@ if __name__ == '__main__':
             servers_tmp = peering_json['peers']
         except Exception as e:
             print("The file peering.json contains erroneous data...")
+
+    with open('data_experimental.json') as f:
+        data_exp = json.load(f)
+    print(data_exp)
     # Keep only port as id
     servers = []
     for serv in servers_tmp:
@@ -53,10 +57,10 @@ if __name__ == '__main__':
     # Main loop
     complete = False
 
+
     # Start chrono
     start = time.time()
     while not complete:
-
         timestep += 1
         # A time sleep to simulate real duration of a time step
         time.sleep(0.1)
@@ -192,4 +196,13 @@ if __name__ == '__main__':
         if total_asw >= 100:
             end_time = time.time()
             print('Experimental time: {}'.format(timedelta(seconds=end_time - start)))
+
+            data_exp["data"].append(
+            {"number node": str(len(peering_json["peers"])),
+            "time": str(timedelta(seconds=end_time - start)),
+            }
+            )
+
+            with open('data_experimental.json', 'w') as json_file:
+                json.dump(data_exp, json_file)
             break
