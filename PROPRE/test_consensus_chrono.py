@@ -2,7 +2,7 @@ import argparse
 import math
 import pickle
 from datetime import datetime
-
+from datetime import timedelta
 import numpy as np
 import time
 import json
@@ -191,6 +191,5 @@ if __name__ == '__main__':
 
         if total_asw >= 100:
             end_time = time.time()
-            print('Experimental time: {}'.format(datetime.timedelta(seconds=end_time - start)))
-
-            
+            print('Experimental time: {}'.format(timedelta(seconds=end_time - start)))
+            break

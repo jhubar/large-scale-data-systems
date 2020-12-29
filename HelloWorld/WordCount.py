@@ -25,20 +25,24 @@ class MainWindow():
 
 
     if __name__ == "__main__":
+
         lot1 = "jour lève notre grisaille"
         lot2 = "trottoir notre ruelle notre tour"
         lot3 = "jour lève notre envie vous"
         lot4 = "faire comprendre tous notre tour"
         lots = np.array([lot1,lot2,lot3,lot4]).tolist()
+
         maps = []
         v = defaultdict(list)
         for lot in lots:
             maps.append(map(1,lot))
+
+        for map in maps:
+            print(map)
+
         mapsFlattened = [ (key, values) for map in maps for (key, values) in map]
 
-        print(sorted(mapsFlattened))
+        # print(sorted(mapsFlattened))
 
         for key, value in sorted(mapsFlattened):
             v[value].append(key)
-
-        print(v)
