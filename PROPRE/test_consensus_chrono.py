@@ -46,7 +46,7 @@ if __name__ == '__main__':
             except Exception as e:
                 print("The file peering.json contains erroneous data...")
 
-        with open('data_experimental_random.json') as f:
+        with open('crash_data.json') as f:
             data_exp = json.load(f)
         print(data_exp)
         # Keep only port as id
@@ -206,6 +206,6 @@ if __name__ == '__main__':
                 }
                 )
 
-                with open('data_experimental_random.json', 'w') as json_file:
+                with open('crash_data.json', 'w') as json_file:
                     json.dump(data_exp, json_file)
                 break

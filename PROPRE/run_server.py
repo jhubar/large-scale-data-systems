@@ -130,7 +130,7 @@ def apply_action():
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--flight-computers-type", type=int, default=1, help="The type of flight computers (Normal=0 or Random=1). (default: 0)")
+    parser.add_argument("--flight-computers-type", type=int, default=0, help="The type of flight computers (Normal=0 or Random=1). (default: 0)")
     parser.add_argument('--type', type=int, default=-1, help="Specifiy the type of bad computer to create: "
                                                              "Full throttle: 0, Random throttle: 1,"
                                                              "Slow: 2, Crashing: 3")
