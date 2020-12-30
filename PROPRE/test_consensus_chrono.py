@@ -20,6 +20,7 @@ def select_leader(servers):
 
 if __name__ == '__main__':
     for it in range(0,10):
+        print(it)
         # Load the pickle files
         actions = pickle.load(open("data/actions.pickle", "rb"))
         states = pickle.load(open("data/states.pickle", "rb"))
@@ -48,7 +49,7 @@ if __name__ == '__main__':
 
         with open('crash_data.json') as f:
             data_exp = json.load(f)
-        print(data_exp)
+
         # Keep only port as id
         servers = []
         for serv in servers_tmp:
@@ -62,10 +63,13 @@ if __name__ == '__main__':
 
 
         start = time.time()
+
         while not complete:
             timestep += 1
+            print(timestep)
             # A time sleep to simulate real duration of a time step
             time.sleep(0.1)
+
 
             # =============================================================================== #
             #                             State Replication step                              #
@@ -74,12 +78,12 @@ if __name__ == '__main__':
             # send to the leader who will organize the replication step to each computers     #
             # =============================================================================== #
 
-            print("Trying to replicate state at timestep {} the state {}".format(timestep, states[timestep]))
+            # print("Trying to replicate state at timestep {} the state {}".format(timestep, states[timestep]))
 
             # Check the leader to contact: if None, a computer of the list is randomly choice
             if id_leader is None:
                 id_leader = select_leader(servers)
-                print('new random leader. Id: {}'.format(id_leader))
+                # print('new random leader. Id: {}'.format(id_leader))
 
             # Prepare the request:
             req = {
@@ -100,7 +104,7 @@ if __name__ == '__main__':
                 continue
             # If connection error:
             if isinstance(reply, dict):
-                print('Connection error with leader id {}'.format(id_leader))
+                # print('Connection error with leader id {}'.format(id_leader))
                 id_leader = None
                 continue
             # Translate the answer:
@@ -110,7 +114,7 @@ if __name__ == '__main__':
                 # if bad_leader: try again with the returned leader id
                 if 'bad_leader' in reply['Error']:
                     id_leader = reply['leader_id']
-                    print('leader redirection to id {}'.format(id_leader))
+                    # print('leader redirection to id {}'.format(id_leader))
                     timestep -= 1
                     continue
 
@@ -118,11 +122,11 @@ if __name__ == '__main__':
                 if 'no_leader' in reply['Error']:
                     id_leader = None
                     continue
-            if 'status' in reply.keys():
-                if reply['status'] == 'succes':
-                    print('State replication: Succes')
-                else:
-                    print('State replication: Echec. No majority of acknowledgment')
+            # if 'status' in reply.keys():
+            #     if reply['status'] == 'succes':
+            #         print('State replication: Succes')
+            #     else:
+            #         print('State replication: Echec. No majority of acknowledgment')
 
             # =============================================================================== #
             #                             Action Consensus step                               #
@@ -135,7 +139,7 @@ if __name__ == '__main__':
             #       the leader orders to each node (and himself) to apply this action         #
             # =============================================================================== #
 
-            print("Trying to make an action consensus at timestep {}".format(timestep))
+            # print("Trying to make an action consensus at timestep {}".format(timestep))
 
             # Prepare the request:
             req = {'to_do': 'action_consensus'}
@@ -151,7 +155,7 @@ if __name__ == '__main__':
                 continue
             # If connection error:
             if isinstance(reply, dict):
-                print('Connection error with leader id {}'.format(id_leader))
+                # print('Connection error with leader id {}'.format(id_leader))
                 id_leader = None
                 continue
             # Translate the answer:
@@ -162,7 +166,7 @@ if __name__ == '__main__':
                 if 'bad_leader' in reply['Error']:
                     id_leader = reply['leader_id']
                     timestep -= 1
-                    print('Leader redirection to id {}'.format(id_leader))
+                    # print('Leader redirection to id {}'.format(id_leader))
                     continue
 
                 # If the system is in election process:
@@ -170,12 +174,12 @@ if __name__ == '__main__':
                     id_leader = None
                     continue
                 # Others type of errors:
-                else:
-                    print('Error during action consensus process. Reply: {}'.format(reply))
+                # else:
+                #     print('Error during action consensus process. Reply: {}'.format(reply))
 
             # If a valid state is reply
-            if 'pitch' in reply.keys():
-                print('Action consensus succes: {}'.format(reply))
+            # if 'pitch' in reply.keys():
+            #     print('Action consensus succes: {}'.format(reply))
 
             # =============================================================================== #
             #                             True answer counting                                #
@@ -193,14 +197,14 @@ if __name__ == '__main__':
 
             if is_same:
                 good_asw += 1
-            print('CONSENSUS-SCORE: good action: {} / {}'.format(good_asw, total_asw))
+            # print('CONSENSUS-SCORE: good action: {} / {}'.format(good_asw, total_asw))
 
             if total_asw >= 100:
                 end_time = time.time()
-                print('Experimental time: {}'.format(timedelta(seconds=end_time - start)))
+                # print('Experimental time: {}'.format(timedelta(seconds=end_time - start)))
 
                 data_exp["data"].append(
-                {"number node": "4",
+                {"number node": "5",
                 "number iteration": str(it),
                 "time": str(timedelta(seconds=end_time - start)),
                 }
