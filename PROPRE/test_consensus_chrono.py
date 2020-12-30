@@ -200,7 +200,7 @@ if __name__ == '__main__':
                 print('Experimental time: {}'.format(timedelta(seconds=end_time - start)))
 
                 data_exp["data"].append(
-                {"number node": str(len(peering_json["peers"])),
+                {"number node": "4",
                 "number iteration": str(it),
                 "time": str(timedelta(seconds=end_time - start)),
                 }
